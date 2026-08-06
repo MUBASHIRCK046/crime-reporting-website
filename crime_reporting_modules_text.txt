@@ -1,0 +1,223 @@
+
+
+=== Page 1 ===
+Crime Reporting Online FIR CSR Management Application 
+ABSTRACT 
+The purpose of Crime Report  Management System is to automate the 
+existing manual system by the help of computerized equipments and full -fledged 
+computer software, fulfilling the requirements of all policemen, so that their 
+valuable data/information can be stored for a longer period with easy accessing of 
+the same. The required software and hardware are easily available and easy to 
+work with. This system also maintains computerized records of all the FIR ,CSR 
+filed against crime. The main aim of this project is to notify each and every  
+policeman about the release of any criminal, including his/her details, such as, 
+criminal’s id, name, type of release and so on. Additionally, it also provides the 
+details of any new rule that has been introduced or any event that is going to take 
+place. It can be used as an application by the police department to manage the 
+records of different activities related to First Information Report. In this system all 
+these activities (like registration of the complaint, updating information) are 
+managed that sav es time. This application is for the police stations that provide 
+facilities for reporting crimes, filing FIR and maintaining prisoner records. It 
+provides better prospective for the enhancement of organization regarding quality 
+and transparency. 
+ 
+ 
+ 
+ 
+ 
+
+=== Page 2 ===
+Objectives 
+The Online Criminal Record Management System applies to police stations 
+across the district and specifically looks into the subject crime detection, 
+conviction of criminals depending on a highly responsive backbone of information 
+management. The eff iciency of the police and the effectiveness with which it 
+tackles crime depend on what quality of information it can derive from its existing 
+records and how fast it can have access to it.  
+This system is made to keep the records about the prisoners and ab out the 
+crimes. Police can login as a user and can add the details of prisoners like name, 
+age, address, crime and punishment. They can also write the First Information 
+Report and can save it. FIR’s date, time, number and details can be seen any time if 
+required by the registered user.  
+This system gives unique id to every FIR as required and the prisoner number 
+will also be unique. Additionally, it tells about any crime that is done through the 
+id of complaint made to the police or if any FIR is done and if the criminal gets 
+caught, the information can be updated about the case. 
+  
+
+=== Page 3 ===
+System Specifications 
+Hardware Requirements:-  
+Operating System :    Android OS 
+Front-End  :    HTML, CSS, and JS 
+Back-End  :    Angular JS, PHP, MYSQL 
+Android Tools: 
+    IDE: android Studio 
+    Android Emulator 
+    xampp-win32-5.5.19-0-VC11 
+  
+PHP Tools: 
+    xampp-win32-5.5.19-0-VC11 
+  
+
+=== Page 4 ===
+Existing Solution: 
+• In the present scenario  filing an FIR/complaint is a hectic task since one 
+must go through a very huge process for justice. It matter how small or big 
+the crime is. In general, to file an FIR/complaint one  must search for a  
+nearby police station and have to wait until a cop takes upon the request  and 
+either we have to recite or have to give it as a written statement.  
+• Certainly this takes nearly a day of an individual’ s time. In this busy world, 
+it’s quite tough to give up on our routine works. The existing system of 
+filing complaints/FIR affects our daily routine, makes us spend a lot of our 
+precious time in it. Filing an FIR, meanwhile we could have done three. 
+Mainly could give a lot of chances and time for verdicts to easily escape 
+from cases making their pre bails ready or even for absconding.  
+• To avoid such miserable situations we have designed an app that makes 
+everything happen in jut few minutes. Below diagram represents the existing 
+process of filing complaints/FIR in police station which starts by a simple 
+request from a Citizen 
+Proposed Solution:  
+• The purpose of this paper is to develop an android application for crime area 
+detection and store criminal records. It provides an application for the user 
+that would provide an alternate path for the users passing by crime area. It 
+allows user to report incidents and get it verified by the police official s. It 
+will consist of an application for police officials which can perform database 
+operations on criminal record and allows efficient retrieval of required 
+information from the centralized database present on Cloud. The application 
+targets general public  and police officials for managing the incidents and 
+crime without consuming much time. This proposed system will be divided 
+into three major modules. 
+• This application will be useful for the remote access of criminal data which 
+will be helpful for the inve stigations carried by police department. 
+
+=== Page 5 ===
+Moreover, it will also provide an alternate safe path on user’s demand before 
+entering the crime area. The database for this project will be stored on cloud 
+to gain remote access. For avoiding any false incidence to  be notified to 
+other user, the information provided will be first verified by the police 
+officials. After approval of the information it will be broadcasted to other 
+users using the application. 
+System Modules: 
+ADMIN 
+• Login 
+• Create category 
+• Create department ( division) 
+• City 
+• Area / Town 
+• Create police user 
+• Manage police user 
+• View compliant report  
+• All report ( CSR / FIR ) 
+ 
+POLICE 
+• Login 
+• View FIR 
+• View CSR 
+• View status 
+User 
+• Register 
+• Login 
+• Create FIR 
+• Create CSR 
+• View FIR 
+
+=== Page 6 ===
+• View CSR 
+• View status 
+• My profile 
+• SOS – SMS alert 
+• Update location 
+ 
+MODULES DESCRIPTION  
+ADMIN 
+• Login 
+The main activities in the application are the admin login page for admin. 
+The other modules are followed by this login page. This module records only 
+admin and password of the admin.  
+• Create category 
+   An admin  can be create category for every department directory and 
+create a category of records.   
+• Create department ( division) 
+  An admin can be creating a department for an every city and sub division 
+also. It based on records will be uploaded. 
+• City 
+  An admin create city module which be included all city list and user can 
+access easily.  
+• Area / Town 
+  An admin will create area and town is based on the city. It will use of 
+upload the compliant with the particular area or town to be mentioned. Then 
+police can handle the report easily. 
+• Create police user 
+
+=== Page 7 ===
+  Admin can create a police user with the personal information like police 
+name, which department, address, Mobile number, city and area to be uploaded. 
+Then admin can give the police user login id and password.  
+• Manage police user 
+  Admin will manage the user database if any modification admin can 
+change the police details. If police officer will transfer to anywhere to be 
+modified in their profile. 
+• View compliant report  
+  Admin can view the compliant rep ort and admin will forward to 
+corresponding police officer. Police officer will take the action for the 
+complaint. 
+• All report ( CSR / FIR ) 
+  Admin will check the all reports like CSR complaints and FIR complaints. 
+Admin will maintain the total reports whi ch all are solved complaints and 
+dissolved  complaint to be rectified. Then admin update the status of every 
+compliant. 
+ 
+ 
+ 
+POLICE 
+•  Login 
+A police officer will login the page with admin created login id and 
+password to be used.  This module records only police officer and password 
+of the police officer.  
+• View FIR 
+  A police officer can be view the FIR complaint copies from the user. And 
+it also have right to update the status of FIR according to current status. 
+
+=== Page 8 ===
+• View CSR 
+  A police officer can be view the CSR complaint copies from the user. And 
+it also have right to update the status of CSR according to current status. 
+• View status 
+  A police officer views the status of complaint registry. Police officer will 
+waiting for status from the admin. Admin can update the status  after police 
+officer will take the action for the complaint. 
+User 
+• Register 
+Another main function of our proposed system is registration, in order to 
+register with the unique application details such as name; password, email, 
+place and time are required. 
+• Login 
+The main activities in the application are the user login page for user. The 
+other modules are followed by this login page. This module records only user 
+and password of the user.  
+• Create FIR 
+  A user wil l create a FIR complaint contain the complainer name, address, 
+nature of complaint and location of complaint everyone is fill the complaint 
+registry of FIR.  
+• Create CSR 
+  A community service register is a register maintained in every Indian 
+police station for a non -cognizable offence. If the offence is a cognizable 
+offence, then a first information report ( FIR) is created and registered. A CSR 
+is also called a daily diary report or diary report. 
+• View status 
+
+=== Page 9 ===
+  User can view the status of  FIR complaint whether it is officer will take 
+the action of complaint they would check the status. 
+• My profile 
+  User view their my profile and if the user can update the profile details and 
+then, the terminate their account. 
+• SOS – SMS alert 
+  A user will give the alert from the SOS emergency. It is used to if anyone 
+affected by someone or some incident they will informed from use of SOS 
+emergency application. If officer get any SMS alert they will reach the location. 
+• Update location 
+  A user can update the current location of incident place or else complaint 
+registry place user will update. 
+ 

@@ -1,0 +1,217 @@
+
+
+=== Page 1 ===
+Watch Video
+Call : +91 9629754500Email: contact@codeshoppy.com
+
+=== Page 2 ===
+
+
+=== Page 3 ===
+CRIME REPORTING MANAGEMENT SYSTEM
+
+=== Page 4 ===
+AIM OF THE PROJECT
+➢ The purpose of Crime Report Management System is to automate the existing manual system by the help of
+computerized equipment’s and full-fledged computer software, fulfilling the requirements of all policemen, so that
+their valuable data/information can be stored for a longer period with easy accessing of the same.
+➢ The required software and hardware are easily available and easy to work with. This system also maintains
+computerized records of all the FIR filed against crime. The main aim of this project is to notify each and every
+policeman about the release of any criminal, including his/her details, such as, criminal’s id, name, type of release
+and so on.
+➢ It can be used as an application by the police department to manage the records of different activities related to First
+Information Report.
+➢ In this system all these activities (like registration of the complaint, updating information) are managed that saves
+time. This application is for the police stations that provide facilities for reporting crimes, filing FIR and maintaining
+prisoner records.
+➢ It provides better prospective for the enhancement of organization regarding quality and transparency.
+
+=== Page 5 ===
+OBJECTIVE OF THIS PROJECT
+➢ The Online Criminal Record Management System applies to police stations across the district and specifically looks
+into the subject crime detection, conviction of criminals depending on a highly responsive backbone of information
+management.
+➢ This system is made to keep the records about the prisoners and about the crimes. Police can login as a user and
+can add the details of prisoners like name, age, address, crime and punishment.
+➢ They can also write the First Information Report and can save it. FIR’s date, time, number and details can be seen
+any time if required by the registered user.
+➢ This system gives unique id to every FIR as required and the prisoner number will also be unique.
+➢ Additionally, it tells about any crime that is done through the id of complaint made to the police or if any FIR is done
+and if the criminal gets caught, the information can be updated about the case.
+
+=== Page 6 ===
+SOFTWARE AND HARDWARE REQUIREMENTS 
+HARDWARE REQUIREMENTS:
+• Processor :     intel pentium iv 1.8 ghz
+• Motherboard                 :     intel 915gvsr chipset board   
+• Ram :     1 gb ddr2 ram
+• Hard disk drive :      160 gb
+SOFTWARE REQUIREMENTS:
+• Front end : html5, css3, bootstrap
+• Back end : php, mysql
+• Control end : angular java script
+PHP  TOOLS:
+• xampp-win32-5.5.19-0-VC11
+ANDROID TOOLS:
+• Android Emulator
+• xampp-win32-5.5.19-0-VC11
+• Android SDK - adt-bundle-windows-x86
+
+
+=== Page 7 ===
+EXISTING SYSTEM 
+➢ In the present scenario filing an FIR/complaint is a hectic task since one must go through a very huge process
+for justice. It matter how small or big the crime is.
+➢ In general, to file an FIR/complaint one must search for a nearby police station and have to wait until a cop
+takes upon the request and either we have to recite or have to give it as a written statement.
+➢ The existing system of filing complaints/FIR affects our daily routine, makes us spend a lot of our precious
+time in it. Filing an FIR, meanwhile we could have done three. Mainly could give a lot of chances and time for
+verdicts to easily escape from cases making their pre bails ready or even for absconding.
+➢ To avoid such miserable situations we have designed an application that makes everything happen in jut few
+minutes. Below diagram represents the existing process of filing complaints/FIR in police station which starts
+by a simple request from a Citizen.
+
+=== Page 8 ===
+DISADVANTAGES OF EXISTING SYSTEM 
+1. Lack of privacy
+2. Risk in the management of the data.
+3. Less Security
+4. Low co-ordination between
+5. Less User-friendly
+6. Accuracy not guaranteed
+7. Not in reach of distant users.
+8. There is no storage and automation if users have some enquiry.
+
+=== Page 9 ===
+PROPOSED SYSTEM 
+➢ The purpose of this paper is to develop an application for crime area detection and store criminal records. It
+provides an application for the user that would provide an alternate path for the users passing by crime area.
+➢ It allows user to report incidents and get it verified by the police officials. It will consist of an application for police
+officials which can perform database operations on criminal record and allows efficient retrieval of required
+information from the centralized database present on Cloud.
+➢ The application targets general public and police officials for managing the incidents and crime without
+consuming much time. This proposed system will be divided into three major modules.
+➢ This application will be useful for the remote access of criminal data which will be helpful for the investigations
+carried by police department.
+➢ Moreover, it will also provide an alternate safe path on user’s demand before entering the crime area. The
+database for this project will be stored on cloud to gain remote access.
+➢ For avoiding any false incidence to be notified to other user, the information provided will be first verified by the
+police officials. After approval of the information it will be broadcasted to other users using the application.
+
+=== Page 10 ===
+ADVANTAGES OF PROPOSED SYSTEM 
+1. The main advantage of online application is an individual can report the crime any time from anywhere
+2. Users can scan the progress of their complaints in online
+3. The details of the users/ reporters won’t show publicly
+4. Incident-based reporting contains a wealth of information that can be used to track problems such as drugs
+trends, find characteristics of victims and perpetrators and informs us about the different locations and time
+property is stolen.
+
+=== Page 11 ===
+MODULE LIST
+PUBLIC/ USER
+➢ Register
+➢ Login
+➢ Create FIR
+➢ Create CSR
+➢ View FIR
+➢ View CSR
+➢ View status
+➢ My profile
+➢ SOS – SMS alert
+➢ Update location
+
+=== Page 12 ===
+MODULE LIST
+ADMIN
+➢ Login
+➢ Create category
+➢ Create department ( division)
+➢ City
+➢ Area / Town
+➢ Create police user
+➢ Manage police user
+➢ View compliant report 
+➢ All report ( CSR / FIR )
+POLICE
+➢ Login
+➢ View FIR
+➢ View CSR
+➢ View status
+
+=== Page 13 ===
+USECASE DIAGRAMS
+USER/ PUBLIC
+User
+Register and login
+create FIR
+create CSR
+view FIR, CSR
+view status
+my profile
+SOS - sms alert
+update location
+
+=== Page 14 ===
+USECASE DIAGRAMS
+ADMIN
+Administrator
+Admin Login
+Create category
+create department
+city, area and town
+create police user
+manage police user
+view complaint report
+all report FIR / CSR
+
+=== Page 15 ===
+USECASE DIAGRAMS
+POLICE
+police
+Police Login
+view FIR
+view CSR
+view complaint status
+
+=== Page 16 ===
+WORK FLOW DIAGRAM FOR ANDROID
+
+
+=== Page 17 ===
+WORK FLOW DIAGRAM FOR WEB APPLICATION
+
+
+=== Page 18 ===
+CONCLUSION
+➢ This application will present a simple, convenient, cost-effective and efficient online crime recording system
+with a sensitive and intelligible web interface, thereby it reduces the amount of manual data entry.
+➢ It is software which helps the policemen to work with the crimes and criminals easily. Additionally, it notifies the
+registered policemen about the release of criminals.
+➢ This crime management system is a solution to all the problems related to the crime reports, criminal details
+and their crimes.
+➢ The problem of reporting fake crimes will be overcome as this application will need the verification of police to
+report incidents reported by user to broadcast it to other users using the same application.
+
+=== Page 19 ===
+FUTURE ENHANCEMENT
+➢ In Future work, This application to develop a cross platforms like IOS, etc.
+➢ In adding the more features of online crime management system to develop access with user’s flexibility.
+➢ To authenticate the users based on the system users list which is maintained by the operating system
+➢ To restrict the usage of all files by the users based on their privileges on the system
+➢ The only challenge of this proposed system is that GPS and the Internet connection has to be activated 24x7.
+
+=== Page 20 ===
+REFERNECES
+➢ Oludeli Awodeli, Onulri Ernest. E,“A Real-Time Records Management System for National Security Agencies
+Department of Computer Science, Babcock University, Ilishan-Remo, Ogun State, Nigeria,Vol.3,Issued 12, May
+2015.
+➢ Sourav Bhowmick, “Criminal Report Management System”, Department of Computer Science and Engineering,
+ADMAS Institute of Technology, 2013.
+➢ Mohammad Shahnawaz, “Crime Reporting and Crime Updates”, 3rd International Conference on System
+Modeling in Research Trends (SMART) College of Computer Science and Information Technology (CCSIT),
+Teerthanker Mahaveer University, Moradabad, 2014.
+➢ Srinidhi Eragam Reddy, Ramya Sahiti Amathi and Priyanka Vakkalagadda “Crime Reporting Interface Design
+using Mobile Technology”, 2nd February, 2015.
+➢ R. G. Jimoh, K. T. Ojulari, and O.A. Enikuomehin, “A Scalable Online Crime Reporting System”, Department of
+Computer Science, University of Ilorin, Nigeria, Vol.7.No.1, January, 2014.
