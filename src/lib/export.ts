@@ -1,8 +1,11 @@
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
 import { CaseLog } from './types';
 
-export function exportCaseToPDF(complaint: any, caseLogs: CaseLog[]) {
+export async function exportCaseToPDF(complaint: any, caseLogs: CaseLog[]) {
+  const jsPDFModule = await import('jspdf');
+  const autoTableModule = await import('jspdf-autotable');
+  const jsPDF = jsPDFModule.default;
+  const autoTable = autoTableModule.default;
+  
   const doc = new jsPDF();
 
   const formattedDate = new Date(complaint.createdAt).toLocaleDateString();

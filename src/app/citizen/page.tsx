@@ -12,7 +12,8 @@ import {
   Shield, LayoutDashboard, FileText, Settings, ShieldAlert,
   Loader2, User, Activity, Monitor, Bell, Users, FileCheck, Car, Lock, LogOut, Clock, MapPin, Save, CheckCircle, UploadCloud, ImageIcon, Search, X
 } from "lucide-react";
-import { SafetyMap } from "@/components/SafetyMap";
+import dynamic from "next/dynamic";
+const SafetyMap = dynamic(() => import("@/components/SafetyMap").then(mod => mod.SafetyMap), { ssr: false, loading: () => <div className="h-[400px] w-full flex items-center justify-center bg-muted/20 rounded-md animate-pulse">Loading Map...</div> });
 import { toast } from "sonner";
 
 import { doc, getDoc } from "firebase/firestore";

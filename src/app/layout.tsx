@@ -32,6 +32,14 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
       suppressHydrationWarning
     >
+      <head>
+        <link rel="preconnect" href="https://firebasestorage.googleapis.com" />
+        <link rel="preconnect" href="https://firestore.googleapis.com" />
+        <link rel="preconnect" href="https://identitytoolkit.googleapis.com" />
+        <link rel="dns-prefetch" href="https://firebasestorage.googleapis.com" />
+        <link rel="dns-prefetch" href="https://firestore.googleapis.com" />
+        <link rel="dns-prefetch" href="https://identitytoolkit.googleapis.com" />
+      </head>
       <body className="min-h-full flex flex-col transition-colors duration-300">
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           {/* Animated Background Blobs */}

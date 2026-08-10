@@ -1,0 +1,614 @@
+# MASTER PROJECT REPLICATION & FIREBASE MIGRATION PROMPT
+# For Antigravity / AI Coding Agent
+
+You are an expert software architect, senior full-stack developer, Firebase engineer, UI/UX engineer, QA engineer, and project migration specialist.
+
+Your task is to completely analyze the existing project provided in the current workspace and create an **EXACT FUNCTIONAL REPLICA** of that project using a **NEW Firebase project/account**.
+
+- **Do NOT** redesign the application.
+- **Do NOT** remove existing functionality.
+- **Do NOT** simplify the application.
+- **Do NOT** replace working functionality with placeholders.
+- **Do NOT** invent missing functionality.
+
+**The Goal:**
+```
+EXISTING PROJECT (Crime Assist)
+       ↓
+COMPLETE ANALYSIS
+       ↓
+COMPLETE DOCUMENTATION
+       ↓
+NEW FIREBASE PROJECT
+       ↓
+NEW CONFIGURATION (.env.local)
+       ↓
+SAME APPLICATION
+       ↓
+SAME UI + SAME PAGES + SAME FUNCTIONS + SAME USER EXPERIENCE
+```
+
+The new application must behave as closely as technically possible to the original application while using the new Firebase backend.
+
+---
+
+# SECTION 1: COMPREHENSIVE PROJECT ANALYSIS & ARCHITECTURE
+
+## 1.1 Project Overview
+- **Application Name:** Crime Assist (Crime Reporting & Law Enforcement Management Platform)
+- **Primary Location:** `C:\Users\Huawei\Desktop\new pjr\crime-app`
+- **Core Purpose:** Real-time bridge between citizens, police officers, and system administrators for reporting crimes (FIR & CSR), tracking case progress, uploading photographic evidence, real-time GPS emergency SOS dispatch, interactive crime hotspot mapping, and police case management with PDF export.
+- **Technology Stack:**
+  - **Framework:** Next.js 16 (App Router)
+  - **Core Libraries:** React 19, TypeScript 5
+  - **Styling:** Tailwind CSS v4, PostCSS, tw-animate-css
+  - **UI & Icons:** Lucide React (`lucide-react`), Sonner (`sonner` toast notifications), Radix/Base UI (`@base-ui/react`, `class-variance-authority`, `clsx`, `tailwind-merge`)
+  - **Animation:** Framer Motion (`framer-motion`)
+  - **Mapping & Geospatial:** MapLibre GL (`maplibre-gl`), `@types/geojson`
+  - **Document Generation:** jsPDF (`jspdf`, `jspdf-autotable`)
+  - **Theming:** `next-themes` (Dark/Light mode support)
+  - **Backend & Database:** Firebase 12.16.0 Client SDK (`firebase/app`, `firebase/auth`, `firebase/firestore`, `firebase/storage`) + Firebase Admin 14.1.0 Server SDK (`firebase-admin`)
+
+## 1.2 System Roles & Permissions Matrix
+1. **Citizen (`role: "citizen"`):**
+   - Public Landing page access with Multi-Language support (English, Malayalam, Hindi).
+   - Citizen registration and authentication with KYC profile data.
+   - Comprehensive multi-step FIR filing (Incident, Offence, Evidence upload, Witnesses, Statement declaration).
+   - Simple CSR (Community Service Register) filing.
+   - Live Emergency SOS trigger with auto-detected GPS coordinates.
+   - "My Complaints" tracking with real-time status badges, investigation timeline logs, and PDF case report download.
+   - Interactive Safety Hotspot Map with zoom, pan, and incident clustering.
+   - Profile management and ID proof / document upload.
+
+2. **Police Officer (`role: "police"`):**
+   - Police Command Center Dashboard (`/police`).
+   - Incident queue: View all registered FIRs and CSRs with filter/search by Status, Type, and Station.
+   - Case details inspection modal with complete Citizen KYC, Attached Evidence photos, and Witness info.
+   - Officer assignment ("Assign to Me" or assign to station team).
+   - Status updates ("Submitted", "Under Review", "Investigating", "FIR Registered", "Resolved", "Dismissed").
+   - Timeline log entries creation (add dated case progress notes visible to citizens and admins).
+   - Verification toggle & Public Broadcast toggle (publish verified safety alerts to public feed).
+   - Live SOS Alert Radar feed (view active emergency distress signals with instant Google Maps redirection).
+   - Case report generation: Export official PDF or direct print preview.
+
+3. **System Administrator (`role: "admin"`):**
+   - System Administration Console (`/admin`).
+   - Real-time KPI analytics counters (Total Complaints, FIRs, CSRs, Pending, Investigating, Resolved).
+   - User Management Table: Full directory of all users (Citizens, Police, Admins).
+   - Create Police Officer account directly via Server Admin API (`/api/admin/create-police`).
+   - Edit Police Badge number, Rank, Station Name, Station Address.
+   - Modify user roles and delete accounts.
+   - Master case audit: View, reassign, and update all FIRs and CSRs across all stations.
+   - System Seed / Setup Utility (`/setup`): One-click database seeder creating default test accounts and taxonomy.
+
+---
+
+# SECTION 2: PAGE & ROUTE INVENTORY
+
+Agent, you must reproduce ALL of the following routes, layouts, and pages:
+
+### 1. `src/app/layout.tsx` (Root Layout)
+- **Route:** Global wrapper for all routes.
+- **Features & Elements:**
+  - Geist & Geist Mono font integration with `display: 'swap'`.
+  - Next-Themes `ThemeProvider` supporting system, light, and dark modes.
+  - Interactive `ThemeToggle` floating component.
+  - Sonner `<Toaster richColors position="top-right" />`.
+  - Atmospheric dynamic ambient blurred background blobs with `animate-blob`.
+  - Network preconnect & dns-prefetch link tags for Firebase endpoints.
+
+### 2. `src/app/page.tsx` (Public Landing & Emergency Portal)
+- **Route:** `/`
+- **Access:** Public (No auth required).
+- **Interactive Elements & Features:**
+  - **Language Selector:** Instant translation toggle between English, Malayalam (മലയാളം), and Hindi (हिन्दी).
+  - **Top Navigation Bar:** Brand logo, Live Status indicator ("SYSTEM: ONLINE", "RESPONSE NET: ACTIVE"), Quick links ("Features", "Live Feed", "Safety Map", "Emergency SOS", "Track FIR"), Login / Sign Up buttons.
+  - **Hero Section:** High-impact animated title, "Report an Incident" CTA (routes to `/citizen/report`), "Police Command Access" CTA (routes to `/login`).
+  - **Quick SOS Emergency Distress Banner:** Instant location capture + emergency hotline buttons (112 Police, 108 Ambulance, 1091 Women Helpline, 1930 Cyber Cell).
+  - **Track FIR / CSR Modal:** Public lookup by FIR Number or Complaint ID with real-time status tracker stepper.
+  - **Live Crime & Incident Ticker:** Real-time ticker showing verified and public broadcasted incidents.
+  - **Interactive Safety Heatmap Preview:** Embedded MapLibre GL instance showing public hotspot pins.
+  - **Statistics Counters:** Animated counters for Solved Cases, Response Time, Protected Citizens, Active Patrols.
+  - **Information Accordion / FAQ:** Common legal questions, FIR vs CSR explanation, Citizen Rights guide.
+
+### 3. `src/app/login/page.tsx` (Unified Authentication Portal)
+- **Route:** `/login`
+- **Access:** Unauthenticated users (Redirects authenticated users based on role).
+- **Elements & Inputs:**
+  - Email input field, Password input field (with show/hide password toggle).
+  - "Sign In" button with loading spinner state.
+  - "Forgot Password?" reset link.
+  - "Quick Demo Credentials" one-click filler buttons (Citizen, Police Officer, Admin).
+  - Link to `/register`.
+  - Smart automatic post-login redirection: Citizen → `/citizen`, Police → `/police`, Admin → `/admin`.
+
+### 4. `src/app/register/page.tsx` (Citizen Registration & KYC)
+- **Route:** `/register`
+- **Access:** Public.
+- **Elements & Inputs:**
+  - Full Name, Email, Password, Confirm Password.
+  - Phone Number, Age, Gender, Blood Group, Residential Address, Emergency Contact Person & Phone.
+  - Terms of Service & Privacy Policy agreement checkbox.
+  - "Create Account" button.
+  - Automatic Firebase Authentication creation + Firestore `/users/{uid}` profile document generation with `role: "citizen"`.
+
+### 5. `src/app/setup/page.tsx` (System Initialization & Seeder)
+- **Route:** `/setup`
+- **Access:** Setup / Developer utility.
+- **Elements & Buttons:**
+  - "Initialize System Database" / "Create Test Accounts" master button.
+  - Individual account generation cards for:
+    - Citizen: `citizen@crimeassist.com` / `Citizen@123`
+    - Officer: `officer@crimeassist.com` / `Officer@123`
+    - Admin: `admin@crimeassist.com` / `Admin@123`
+  - Real-time status indicators (Idle, Creating/Loading, Created ✅, Already Exists ✅).
+  - Direct navigation action buttons to test each dashboard immediately.
+
+### 6. `src/app/citizen/page.tsx` (Citizen Command Center)
+- **Route:** `/citizen`
+- **Access:** Protected (Citizen role required).
+- **Navigation Tabs:**
+  1. **Dashboard Overview:** Welcome card, Emergency SOS alert trigger button, summary metrics of filed cases.
+  2. **My Complaints:** Table/Card view of all filed CSRs and FIRs, filter by status (All, Pending, In Progress, Resolved), "View Details" modal with investigation timeline, "Export to PDF" button.
+  3. **File Report:** Shortcut redirect to `/citizen/report`.
+  4. **Safety Map:** Full-width MapLibre GL map component rendering nearby reported incident pins and danger zones.
+  5. **Profile & KYC:** View personal info, edit phone/address, upload ID proof / Aadhaar / Passport image to Firebase Storage (`profile_documents/{uid}`).
+
+### 7. `src/app/citizen/report/page.tsx` (Comprehensive Incident Reporting Wizard)
+- **Route:** `/citizen/report`
+- **Access:** Protected (Citizen role required).
+- **Report Type Switcher:** Toggle between **FIR (First Information Report)** and **CSR (Community Service Register)**.
+- **5-Step FIR Filing Wizard:**
+  - **Step 1: Complainant Verification:** Validates user profile completion from Firestore.
+  - **Step 2: Incident Details:** Incident Date, Incident Time, Location/Address, Police Station jurisdiction, District, State, Detailed Incident Description, Known Accused details, Unknown Accused description.
+  - **Step 3: Offence Details:** Crime Category dropdown (Theft, Assault, Cybercrime, Harassment, Fraud, Robbery, etc.), Offence Type, Loss Amount, Physical Injury details, Threat / Weapon details.
+  - **Step 4: Evidence & Witnesses:** Multiple file upload dropzone (Images/Docs to Firebase Storage), Add/Remove multiple witness rows (Name, Phone, Address, Witness Statement).
+  - **Step 5: Statement & Legal Declaration:** Written complainant declaration, date, verification terms agreement checkbox.
+  - **Submission Result Screen:** Displays generated official FIR number (e.g. `FIR-2026-ABCD-1234`), copy button, and "Return to Dashboard" button.
+
+### 8. `src/app/police/page.tsx` (Police Command Center)
+- **Route:** `/police`
+- **Access:** Protected (Police role required).
+- **Navigation Tabs & Views:**
+  1. **Dashboard & Metrics:** Active Cases count, Pending Verification count, Resolved Cases count, Active SOS count.
+  2. **Incident Register:** Comprehensive table of all complaints across the jurisdiction.
+     - Search by FIR Number, Title, Citizen Name, or Location.
+     - Filter by Status ("Pending", "Under Review", "Investigating", "Resolved", "Dismissed") and Type ("FIR", "CSR").
+     - Row action: "Open Case File" modal.
+  3. **Case Investigation Modal:**
+     - Tab 1: Incident & Complainant KYC information (Full citizen info, phone, address).
+     - Tab 2: Attached Evidence Gallery (Full image modal preview).
+     - Tab 3: Investigation Timeline & Case Logs (Add new progress log note, view chronological case updates).
+     - Action Controls: Status updater dropdown, "Assign to Me" button, "Verify Case" toggle, "Broadcast to Public Safety Feed" toggle, "Export Case to PDF" button, "Print Case File" button.
+  4. **Live SOS Emergency Radar:** Real-time feed of active citizen distress signals showing live timestamp, user ID, and "Open in Google Maps" direct GPS navigation button.
+  5. **Officer Profile:** View badge number, rank, station name, and active status.
+
+### 9. `src/app/admin/page.tsx` (System Administration Console)
+- **Route:** `/admin`
+- **Access:** Protected (Admin role required).
+- **Navigation Tabs:**
+  1. **Overview & Analytics:** System-wide KPI dashboard, complaints resolution rate charts, breakdown by crime category.
+  2. **User Management:** Complete user registry.
+     - Filter by role: All, Citizens, Police Officers, Admins.
+     - Citizen Actions: View KYC, Delete User.
+     - Police Actions: "Add Police Officer" modal (Calls `/api/admin/create-police`), "Edit Officer" modal (Update badge number, rank, station name), Change Role dropdown.
+  3. **All Complaints Master Audit:** Global view of all cases with officer reassignment dropdown, status override, and timeline inspection.
+  4. **Taxonomy & Settings:** Add/Delete Crime Categories, Police Stations, and Operational Areas.
+
+---
+
+# SECTION 3: COMPLETE FIRESTORE DATABASE SCHEMA
+
+Agent, the new Firebase Firestore database must support the following collections, documents, and fields:
+
+### 1. Collection: `users`
+- **Document ID:** Firebase Auth User UID (`user.uid`)
+- **Fields:**
+  ```typescript
+  {
+    uid: string;                 // Matches Firebase Auth UID
+    name: string;                // User's full name
+    email: string;               // User's email address
+    role: "citizen" | "police" | "admin";
+    phone?: string;              // Contact number
+    age?: number;
+    gender?: string;             // "Male" | "Female" | "Other"
+    bloodGroup?: string;         // e.g. "O+", "A+", "B+"
+    address?: string;            // Residential address
+    emergencyContactName?: string;
+    emergencyContactPhone?: string;
+    kycDocumentUrl?: string;     // Firebase Storage URL of uploaded ID proof
+    
+    // Police specific fields:
+    badgeNumber?: string;        // e.g. "KL-POL-4421"
+    rank?: string;               // e.g. "Sub-Inspector", "Inspector", "DSP"
+    stationName?: string;        // e.g. "Central Police Station"
+    stationAddress?: string;
+    isActive?: boolean;          // true / false
+    
+    createdAt: string;           // ISO 8601 string
+    updatedAt?: string;
+  }
+  ```
+
+### 2. Collection: `complaints` (CSR & Legacy Reports)
+- **Document ID:** Auto-generated by Firestore (`addDoc`)
+- **Fields:**
+  ```typescript
+  {
+    citizenId: string;           // UID of complainant
+    type: "CSR" | "FIR";
+    title: string;               // Short title / subject
+    description: string;         // Incident narrative
+    location: string;            // Address or landmark
+    status: "Pending" | "In Progress" | "Investigating" | "Resolved" | "Closed";
+    priority?: "Low" | "Medium" | "High" | "Critical";
+    category?: string;           // Crime category name
+    imageUrl: string | null;     // Firebase Storage URL for attached evidence
+    assignedOfficerId?: string | null;
+    assignedOfficerName?: string | null;
+    isVerified?: boolean;        // Verified by police
+    isBroadcasted?: boolean;     // Published to public safety feed
+    createdAt: string;           // ISO 8601 string
+    updatedAt?: string;
+  }
+  ```
+
+### 3. Collection: `incidents` (Comprehensive FIR Incidents)
+- **Document ID:** Auto-generated
+- **Fields:**
+  ```typescript
+  {
+    firNumber: string;           // e.g. "FIR-2026-A8F2-9012"
+    complainantId: string;       // User UID
+    incidentDate: string;        // YYYY-MM-DD
+    incidentTime: string;        // HH:MM
+    location: string;            // Street / locality
+    policeStation: string;       // Jurisdiction station name
+    district: string;
+    state: string;
+    description: string;
+    accusedDetails?: string;     // Named suspects
+    unknownAccusedDetails?: string; // Physical descriptions of unknown suspects
+    category?: string;
+    createdAt: string;
+  }
+  ```
+
+### 4. Collection: `offences`
+- **Document ID:** Auto-generated
+- **Fields:**
+  ```typescript
+  {
+    firNumber: string;
+    category: string;
+    offenceType: string;
+    crimeDescription: string;
+    lossAmount?: string;
+    injuryDetails?: string;
+    threatDetails?: string;
+  }
+  ```
+
+### 5. Collection: `evidence`
+- **Document ID:** Auto-generated
+- **Fields:**
+  ```typescript
+  {
+    firNumber: string;
+    fileName: string;
+    fileType: string;            // "image/jpeg", "image/png", "application/pdf"
+    fileURL: string;             // Firebase Storage download URL
+    uploadedBy: string;          // User UID
+    uploadedDate: string;
+  }
+  ```
+
+### 6. Collection: `witnesses`
+- **Document ID:** Auto-generated
+- **Fields:**
+  ```typescript
+  {
+    firNumber: string;
+    name: string;
+    phone: string;
+    address: string;
+    statement: string;
+  }
+  ```
+
+### 7. Collection: `statements`
+- **Document ID:** Auto-generated
+- **Fields:**
+  ```typescript
+  {
+    firNumber: string;
+    statementText: string;
+    date: string;
+    verificationStatus: "Pending" | "Verified" | "Rejected";
+  }
+  ```
+
+### 8. Collection: `officer_reviews`
+- **Document ID:** Auto-generated
+- **Fields:**
+  ```typescript
+  {
+    firNumber: string;
+    officerId?: string | null;
+    officerName?: string | null;
+    status: "Submitted" | "Under Review" | "FIR Registered" | "Investigating" | "Resolved" | "Dismissed";
+    reviewNotes?: string;
+    isVerified?: boolean;
+    isBroadcasted?: boolean;
+    updatedAt: string;
+  }
+  ```
+
+### 9. Collection: `sos_alerts` (Live Emergency SOS)
+- **Document ID:** Auto-generated
+- **Fields:**
+  ```typescript
+  {
+    citizenId: string;
+    location: {
+      latitude: number;
+      longitude: number;
+    };
+    status: "Active" | "Resolved";
+    timestamp: string;
+    resolvedBy?: string;
+    resolvedAt?: string;
+  }
+  ```
+
+### 10. Collection: `case_logs` (Investigation Timeline)
+- **Document ID:** Auto-generated
+- **Fields:**
+  ```typescript
+  {
+    complaintId: string;         // Complaint ID or FIR Number
+    text: string;                // Progress log entry
+    authorId: string;
+    authorName: string;
+    authorRole: "police" | "admin";
+    timestamp: string;
+    isPublic?: boolean;          // Visible to citizen complainant
+  }
+  ```
+
+### 11. Collections: `categories`, `departments`, `areas`
+- `categories`: `{ name: string, createdAt: string }`
+- `departments`: `{ name: string, createdAt: string }`
+- `areas`: `{ name: string, city: string, createdAt: string }`
+
+---
+
+# SECTION 4: FIREBASE STORAGE PATHS & CONFIGURATION
+
+- **Evidence Uploads:** `evidence/{citizenId}/{timestamp}_{filename}`
+- **FIR Evidence Files:** `fir_evidence/{firNumber}/{timestamp}_{filename}`
+- **User KYC Documents:** `profile_documents/{uid}/{timestamp}_{filename}`
+
+---
+
+# SECTION 5: SECURITY RULES SPECIFICATION
+
+Agent, deploy the following production-ready security rules to your new Firebase project:
+
+### 5.1 Cloud Firestore Security Rules (`firestore.rules`)
+```javascript
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+    function isPoliceOrAdmin() {
+      return isAuthenticated() && (getUserData().role == 'police' || getUserData().role == 'admin');
+    }
+    function isAdmin() {
+      return isAuthenticated() && getUserData().role == 'admin';
+    }
+
+    // Users Collection
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isOwner(userId) || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Complaints (CSR) Collection
+    match /complaints/{complaintId} {
+      allow read: if isAuthenticated() && (resource.data.citizenId == request.auth.uid || isPoliceOrAdmin() || resource.data.isBroadcasted == true);
+      allow create: if isAuthenticated();
+      allow update, delete: if isPoliceOrAdmin();
+    }
+
+    // FIR Incidents Collection
+    match /incidents/{incidentId} {
+      allow read: if isAuthenticated() && (resource.data.complainantId == request.auth.uid || isPoliceOrAdmin());
+      allow create: if isAuthenticated();
+      allow update, delete: if isPoliceOrAdmin();
+    }
+
+    // FIR Supporting Sub-collections & Tables
+    match /offences/{id} { allow read, write: if isAuthenticated(); }
+    match /evidence/{id} { allow read, write: if isAuthenticated(); }
+    match /witnesses/{id} { allow read, write: if isAuthenticated(); }
+    match /statements/{id} { allow read, write: if isAuthenticated(); }
+    match /officer_reviews/{id} { 
+      allow read: if isAuthenticated();
+      allow write: if isPoliceOrAdmin();
+    }
+
+    // SOS Alerts Collection
+    match /sos_alerts/{alertId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isPoliceOrAdmin();
+    }
+
+    // Case Logs
+    match /case_logs/{logId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isPoliceOrAdmin();
+    }
+
+    // Taxonomies
+    match /categories/{id} { allow read: if true; allow write: if isAdmin(); }
+    match /departments/{id} { allow read: if true; allow write: if isAdmin(); }
+    match /areas/{id} { allow read: if true; allow write: if isAdmin(); }
+  }
+}
+```
+
+### 5.2 Firebase Storage Rules (`storage.rules`)
+```javascript
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /evidence/{userId}/{allPaths=**} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+    match /fir_evidence/{firNumber}/{allPaths=**} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+    match /profile_documents/{userId}/{allPaths=**} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+  }
+}
+```
+
+---
+
+# SECTION 6: HOW TO CONNECT A NEW FIREBASE ACCOUNT
+
+Follow this exact guide to connect a fresh Firebase project:
+
+### Step 1: Create a New Firebase Project
+1. Open the [Firebase Console](https://console.firebase.google.com/) and click **Add Project**.
+2. Name your project (e.g., `crime-assist-new`). Disable Google Analytics if not needed.
+
+### Step 2: Enable Firebase Services
+1. **Authentication:** Go to *Build > Authentication > Get Started*. Enable **Email/Password**.
+2. **Cloud Firestore:** Go to *Build > Firestore Database > Create Database*. Select a region near your users and start in **Test Mode** (you will apply the security rules above).
+3. **Cloud Storage:** Go to *Build > Storage > Get Started*. Accept default bucket settings.
+
+### Step 3: Register Web App & Get Client Keys
+1. In Project Settings (gear icon) > General, scroll to **Your apps** and click the Web icon (`</>`).
+2. App nickname: `Crime Assist Web`. Click **Register App**.
+3. Copy the configuration object.
+
+### Step 4: Generate Service Account Key (For Server Admin SDK)
+1. Go to **Project Settings > Service Accounts**.
+2. Click **Generate new private key** and download the `.json` file.
+
+### Step 5: Configure `.env.local`
+In the root directory of your project, create or update `.env.local`:
+```env
+# Client-side Configuration (Safe in browser bundle)
+NEXT_PUBLIC_FIREBASE_API_KEY="AIzaSyYourNewApiKeyHere..."
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN="your-new-project.firebaseapp.com"
+NEXT_PUBLIC_FIREBASE_PROJECT_ID="your-new-project-id"
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET="your-new-project.firebasestorage.app"
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID="123456789012"
+NEXT_PUBLIC_FIREBASE_APP_ID="1:123456789012:web:abcdef123456"
+NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID="G-XXXXXXXXXX"
+
+# Server-side Admin SDK Secrets (NEVER expose to client)
+FIREBASE_ADMIN_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC...\n-----END PRIVATE KEY-----\n"
+FIREBASE_ADMIN_CLIENT_EMAIL="firebase-adminsdk-xxxxx@your-new-project.iam.gserviceaccount.com"
+```
+
+---
+
+# SECTION 7: STEP-BY-STEP REPLICATION & SETUP SCRIPTS
+
+### 7.1 Automated Setup Script (`scripts/setup.ps1`)
+Save this PowerShell script in `scripts/setup.ps1` for instant Windows setup:
+```powershell
+Write-Host "=========================================" -ForegroundColor Cyan
+Write-Host "  Crime Assist Project Setup & Migration " -ForegroundColor Cyan
+Write-Host "=========================================" -ForegroundColor Cyan
+
+# 1. Check Node.js
+if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
+    Write-Host "Error: Node.js is not installed. Please install Node.js v18+." -ForegroundColor Red
+    exit 1
+}
+Write-Host "Node.js Version: $(node -v)" -ForegroundColor Green
+
+# 2. Install Dependencies
+Write-Host "Installing project dependencies..." -ForegroundColor Yellow
+npm install
+
+# 3. Check .env.local
+if (-not (Test-Path ".env.local")) {
+    Write-Host "Warning: .env.local not found. Copying from .env.example..." -ForegroundColor Yellow
+    Copy-Item ".env.example" ".env.local"
+    Write-Host "Please edit .env.local with your new Firebase credentials." -ForegroundColor Red
+} else {
+    Write-Host ".env.local configuration file detected." -ForegroundColor Green
+}
+
+Write-Host "=========================================" -ForegroundColor Cyan
+Write-Host "Setup completed! Run 'npm run dev' to start." -ForegroundColor Green
+Write-Host "Then visit http://localhost:3000/setup to initialize default accounts." -ForegroundColor Green
+Write-Host "=========================================" -ForegroundColor Cyan
+```
+
+### 7.2 Manual Installation Steps
+1. Open PowerShell and navigate to the project directory:
+   ```powershell
+   cd "C:\Users\Huawei\Desktop\new pjr\crime-app"
+   ```
+2. Install all required dependencies:
+   ```bash
+   npm install
+   ```
+3. Ensure `.env.local` contains the new Firebase project credentials.
+4. Launch development server:
+   ```bash
+   npm run dev
+   ```
+5. Navigate to `http://localhost:3000/setup` in your browser and click **"Initialize System Database"** to seed initial Citizen, Officer, and Admin credentials.
+6. Log in through `http://localhost:3000/login` to test all dashboards.
+
+---
+
+# SECTION 8: EXACT REPLICATION AUDIT CHECKLIST
+
+Agent, verify that every single item below is active and functioning in the replica:
+
+- [ ] Multi-language translation dictionary in `src/app/page.tsx` (English, Malayalam, Hindi) works seamlessly.
+- [ ] Emergency SOS trigger on landing page and citizen dashboard logs coordinates to `sos_alerts`.
+- [ ] Live crime ticker and track complaint modal in `src/app/page.tsx` query Firestore live.
+- [ ] User registration creates both Firebase Auth credential and Firestore `/users/{uid}` document.
+- [ ] User login correctly detects role and redirects: Citizen → `/citizen`, Police → `/police`, Admin → `/admin`.
+- [ ] Multi-step FIR Incident Report wizard uploads evidence files to Firebase Storage and writes to `incidents`, `offences`, `evidence`, `witnesses`, `statements`, and `officer_reviews`.
+- [ ] Simple CSR form files complaint directly to `complaints` collection.
+- [ ] Police command center lists all incidents, updates case statuses, adds case logs, and toggles verification/broadcast.
+- [ ] PDF export in Police/Admin dashboard (`exportCaseToPDF`) and Print preview (`printCaseDetails`) render case file sheets correctly.
+- [ ] Admin console user table allows creating police officers via `/api/admin/create-police`, modifying badge numbers, and reassigning cases.
+- [ ] MapLibre GL map component renders dynamically without SSR hydration errors.
+- [ ] Dark/Light mode theme toggle functions across all views.
+- [ ] No old Firebase account URLs, hardcoded project IDs, or legacy credentials remain.
+
+---
+
+**FINAL INSTRUCTION:**
+Execute the replication with precision. Ensure the exact UI styling, color scheme, glassmorphism cards, responsive layouts, and seamless Firebase operations are 100% faithful to the original Crime Assist application!
