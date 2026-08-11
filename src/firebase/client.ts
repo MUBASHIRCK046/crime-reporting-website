@@ -32,7 +32,19 @@ const auth = getAuth(app);         // For logging in
 const db = getFirestore(app);      // For saving text data (complaints)
 const storage = getStorage(app);   // For saving images/videos
 
-export { app, auth, db, storage };
+// Analytics only runs in the browser environment (client-side)
+let analytics = null;
+if (typeof window !== "undefined" && firebaseConfig.measurementId) {
+  import("firebase/analytics").then(({ getAnalytics, isSupported }) => {
+    isSupported().then((supported) => {
+      if (supported) {
+        analytics = getAnalytics(app);
+      }
+    });
+  });
+}
+
+export { app, auth, db, storage, analytics };
 
 /**
  * Beginner Note: We "export" app, auth, db, and storage so that ANY
