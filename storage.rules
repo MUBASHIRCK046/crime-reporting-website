@@ -1,0 +1,40 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isValidImage() {
+      return request.resource.contentType.matches('image/.*') || 
+             request.resource.contentType.matches('application/pdf');
+    }
+
+    function isUnderMaxSize() {
+      return request.resource.size < 10 * 1024 * 1024; // 10MB limit
+    }
+
+    // Citizen Evidence Uploads (Only the authenticated owner can upload)
+    match /evidence/{userId}/{fileName} {
+      allow read: if isAuthenticated();
+      allow write: if isOwner(userId) && isValidImage() && isUnderMaxSize();
+    }
+
+    // FIR Evidence Repository
+    match /fir_evidence/{firNumber}/{fileName} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && isValidImage() && isUnderMaxSize();
+    }
+
+    // Citizen Profile & KYC Documents (Aadhaar / Passport / ID)
+    match /profile_documents/{userId}/{fileName} {
+      allow read: if isAuthenticated();
+      allow write: if isOwner(userId) && isValidImage() && isUnderMaxSize();
+    }
+  }
+}
