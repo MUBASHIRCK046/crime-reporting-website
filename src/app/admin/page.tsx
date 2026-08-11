@@ -26,6 +26,8 @@ export default function AdminDashboard() {
   
   const [complaintsData, setComplaintsData] = useState<any[]>([]);
   const [usersData, setUsersData] = useState<any[]>([]);
+  const [userSearchQuery, setUserSearchQuery] = useState("");
+  const [userRoleFilter, setUserRoleFilter] = useState("ALL");
 
   const [selectedComplaint, setSelectedComplaint] = useState<any | null>(null);
   const [selectedCitizenProfile, setSelectedCitizenProfile] = useState<any | null>(null);
@@ -192,40 +194,74 @@ export default function AdminDashboard() {
   };
 
   const renderUsersTable = () => {
-    const admins = usersData.filter(u => u.role === 'admin');
-    const citizens = usersData.filter(u => u.role === 'citizen');
-    const police = usersData.filter(u => u.role === 'police');
+    // 1. Filter by role
+    const roleFiltered = userRoleFilter === "ALL" 
+      ? usersData 
+      : usersData.filter(u => (u.role || "citizen").toLowerCase() === userRoleFilter.toLowerCase());
 
-    const handlePrintUsers = (role: string, users: any[]) => {
+    // 2. Filter by search query (Name, Email, UID, Station, Badge)
+    const filteredUsers = roleFiltered.filter(u => {
+      if (!userSearchQuery.trim()) return true;
+      const q = userSearchQuery.toLowerCase();
+      return (
+        (u.name && u.name.toLowerCase().includes(q)) ||
+        (u.email && u.email.toLowerCase().includes(q)) ||
+        (u.uid && u.uid.toLowerCase().includes(q)) ||
+        (u.role && u.role.toLowerCase().includes(q)) ||
+        (u.stationName && u.stationName.toLowerCase().includes(q)) ||
+        (u.badgeNumber && u.badgeNumber.toLowerCase().includes(q))
+      );
+    });
+
+    const counts = {
+      all: usersData.length,
+      admin: usersData.filter(u => u.role === "admin").length,
+      citizen: usersData.filter(u => (u.role || "citizen") === "citizen").length,
+      police: usersData.filter(u => u.role === "police").length,
+    };
+
+    const handlePrintUsers = () => {
       const printWindow = window.open('', '_blank');
       if (!printWindow) return;
       printWindow.document.write(`
         <html>
           <head>
-            <title>${role} Users</title>
+            <title>Users Registry (${userRoleFilter})</title>
             <style>
-              body { font-family: sans-serif; padding: 20px; }
-              table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-              th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-              th { background-color: #f2f2f2; }
+              body { font-family: system-ui, -apple-system, sans-serif; padding: 24px; color: #111827; }
+              h2 { margin-bottom: 8px; color: #059669; }
+              p { color: #6b7280; font-size: 13px; margin-bottom: 20px; }
+              table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 12px; }
+              th, td { border: 1px solid #e5e7eb; padding: 10px 12px; text-align: left; }
+              th { background-color: #f9fafb; font-weight: bold; text-transform: uppercase; font-size: 11px; color: #374151; }
+              tr:nth-child(even) { background-color: #fcfdfd; }
+              .badge { display: inline-block; padding: 2px 8px; border-radius: 9999px; font-weight: bold; text-transform: uppercase; font-size: 10px; }
+              .uid { font-family: monospace; font-size: 11px; color: #6b7280; }
             </style>
           </head>
           <body>
-            <h2>${role} Users (${users.length})</h2>
+            <h2>Crime Assist &bull; Users Registry</h2>
+            <p>Filter: <strong>${userRoleFilter}</strong> | Total Records: <strong>${filteredUsers.length}</strong> | Generated on: ${new Date().toLocaleString()}</p>
             <table>
               <thead>
                 <tr>
+                  <th style="width: 40px;"># ID</th>
                   <th>Name</th>
                   <th>Email</th>
+                  <th>Role</th>
+                  <th>Date of Join</th>
                   <th>UID</th>
                 </tr>
               </thead>
               <tbody>
-                ${users.map(u => `
+                ${filteredUsers.map((u, i) => `
                   <tr>
-                    <td>${u.name || '-'}</td>
+                    <td><strong>${i + 1}</strong></td>
+                    <td><strong>${u.name || 'Unknown'}</strong></td>
                     <td>${u.email || '-'}</td>
-                    <td>${u.uid || '-'}</td>
+                    <td><span class="badge">${u.role || 'Citizen'}</span></td>
+                    <td>${u.createdAt ? new Date(u.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '-'}</td>
+                    <td class="uid">${u.uid || '-'}</td>
                   </tr>
                 `).join('')}
               </tbody>
@@ -242,95 +278,250 @@ export default function AdminDashboard() {
       printWindow.document.close();
     };
 
-    const handleDownloadUsers = (role: string, users: any[]) => {
-      const headers = ['Name', 'Email', 'UID'];
+    const handleDownloadUsers = () => {
+      const headers = ['ID', 'Name', 'Email', 'Role', 'Date of Join', 'UID'];
       const csvContent = [
         headers.join(','),
-        ...users.map(u => `"${u.name || ''}","${u.email || ''}","${u.uid || ''}"`)
+        ...filteredUsers.map((u, i) => [
+          i + 1,
+          `"${(u.name || '').replace(/"/g, '""')}"`,
+          `"${(u.email || '').replace(/"/g, '""')}"`,
+          `"${(u.role || 'citizen').toUpperCase()}"`,
+          `"${u.createdAt ? new Date(u.createdAt).toLocaleDateString() : ''}"`,
+          `"${u.uid || ''}"`
+        ].join(','))
       ].join('\n');
       
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);
-      link.setAttribute('download', `${role}_Users.csv`);
+      link.setAttribute('download', `Users_Registry_${userRoleFilter}_${new Date().toISOString().split('T')[0]}.csv`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
     };
 
-    const renderRoleColumn = (title: string, users: any[], colorRole: string) => (
-      <div className="glass-panel overflow-hidden shadow-sm flex flex-col h-[600px]">
-        <div className="p-4 border-b border-white/10 bg-black/5 dark:bg-white/5 flex items-center justify-between">
-          <h3 className={`font-bold uppercase tracking-wider text-sm ${colorRole}`}>{title} ({users.length})</h3>
-          <div className="flex gap-2">
+    return (
+      <div className="space-y-4">
+        {/* TOP CONTROLS: Role Filter Tabs + Search + Actions */}
+        <div className="flex flex-col md:flex-row gap-4 items-stretch md:items-center justify-between">
+          {/* Role Filter Tabs */}
+          <div className="flex items-center gap-1.5 p-1 bg-ui-bg border border-ui-border rounded-xl backdrop-blur-md overflow-x-auto">
+            {[
+              { id: "ALL", label: "All Users", count: counts.all },
+              { id: "citizen", label: "Citizens", count: counts.citizen },
+              { id: "police", label: "Police", count: counts.police },
+              { id: "admin", label: "Admins", count: counts.admin },
+            ].map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setUserRoleFilter(tab.id)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
+                  userRoleFilter === tab.id
+                    ? "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 shadow-sm"
+                    : "text-text-secondary hover:text-text-primary hover:bg-white/10 dark:hover:bg-white/5"
+                }`}
+              >
+                <span>{tab.label}</span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                  userRoleFilter === tab.id
+                    ? "bg-emerald-500 text-white dark:bg-emerald-400 dark:text-slate-900"
+                    : "bg-black/10 dark:bg-white/10 text-text-tertiary"
+                }`}>
+                  {tab.count}
+                </span>
+              </button>
+            ))}
+          </div>
+
+          {/* Search Bar + Export/Print Buttons */}
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1 sm:w-64">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary pointer-events-none" />
+              <input
+                type="text"
+                placeholder="Search name, email, UID..."
+                value={userSearchQuery}
+                onChange={(e) => setUserSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-3 py-2 text-xs rounded-xl bg-ui-bg border border-ui-border focus:border-emerald-500/50 focus:outline-none transition-all placeholder:text-text-tertiary"
+              />
+              {userSearchQuery && (
+                <button 
+                  onClick={() => setUserSearchQuery("")}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-tertiary hover:text-text-primary p-0.5"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+
             <button 
-              onClick={() => handleDownloadUsers(title, users)}
-              className="p-1.5 rounded-lg bg-ui-bg border border-ui-border hover:bg-white/40 dark:hover:bg-white/5 transition-colors text-text-secondary hover:text-text-primary"
-              title={`Download ${title} Users (CSV)`}
+              onClick={handleDownloadUsers}
+              className="p-2 rounded-xl bg-ui-bg border border-ui-border hover:bg-white/40 dark:hover:bg-white/5 transition-colors text-text-secondary hover:text-text-primary shrink-0"
+              title="Download CSV"
             >
               <Download className="w-4 h-4" />
             </button>
             <button 
-              onClick={() => handlePrintUsers(title, users)}
-              className="p-1.5 rounded-lg bg-ui-bg border border-ui-border hover:bg-white/40 dark:hover:bg-white/5 transition-colors text-text-secondary hover:text-text-primary"
-              title={`Print ${title} Users`}
+              onClick={handlePrintUsers}
+              className="p-2 rounded-xl bg-ui-bg border border-ui-border hover:bg-white/40 dark:hover:bg-white/5 transition-colors text-text-secondary hover:text-text-primary shrink-0"
+              title="Print Users"
             >
               <Printer className="w-4 h-4" />
             </button>
           </div>
         </div>
-        <div className="overflow-y-auto flex-1 p-2 space-y-2">
-          {users.length === 0 ? (
-             <div className="p-4 text-center text-text-tertiary text-xs">No users found.</div>
-          ) : (
-            users.map(user => (
-              <div key={user.id || user.uid} className="p-3 bg-ui-bg rounded-lg border border-ui-border hover:bg-white/40 dark:hover:bg-white/5 transition-colors group relative">
-                <div className="font-medium text-sm text-text-primary mb-1 pr-8">{user.name}</div>
-                <div className="text-xs text-text-secondary truncate">{user.email}</div>
-                <div className="text-[10px] text-text-tertiary font-mono mt-2 truncate">UID: {user.uid}</div>
-                {title === "Citizen" && (
-                  <button 
-                    onClick={async () => {
-                      setIsProfileModalOpen(true);
-                      setFetchingProfile(true);
-                      const { profile } = await getUserProfile(user.uid);
-                      setSelectedCitizenProfile(profile);
-                      setFetchingProfile(false);
-                    }}
-                    className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 dark:text-blue-400 rounded-lg border border-blue-500/20"
-                    title="View Profile"
-                  >
-                    <Eye className="w-4 h-4" />
-                  </button>
-                )}
-                {title === "Police" && (
-                  <button 
-                    onClick={async () => {
-                      setIsPoliceProfileModalOpen(true);
-                      setFetchingProfile(true);
-                      const { profile } = await getUserProfile(user.uid);
-                      // Merge core user data in case profile is missing some fields
-                      setSelectedPoliceProfile({ ...user, ...profile });
-                      setFetchingProfile(false);
-                    }}
-                    className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 bg-purple-500/10 hover:bg-purple-500/20 text-purple-600 dark:text-purple-400 rounded-lg border border-purple-500/20"
-                    title="View Police Profile"
-                  >
-                    <Eye className="w-4 h-4" />
-                  </button>
-                )}
-              </div>
-            ))
-          )}
-        </div>
-      </div>
-    );
 
-    return (
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {renderRoleColumn("Admin", admins, "text-emerald-600 dark:text-emerald-400")}
-        {renderRoleColumn("Citizen", citizens, "text-blue-600 dark:text-blue-400")}
-        {renderRoleColumn("Police", police, "text-purple-600 dark:text-purple-400")}
+        {/* MAIN USERS TABLE */}
+        <div className="glass-panel overflow-hidden shadow-sm border border-ui-border rounded-2xl">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-black/5 dark:bg-white/5 text-[10px] uppercase tracking-wider text-text-secondary border-b border-white/20">
+                  <th className="px-6 py-4 font-bold w-16">ID</th>
+                  <th className="px-6 py-4 font-bold">NAME</th>
+                  <th className="px-6 py-4 font-bold">EMAIL</th>
+                  <th className="px-6 py-4 font-bold">ROLE</th>
+                  <th className="px-6 py-4 font-bold">DATE OF JOIN</th>
+                  <th className="px-6 py-4 font-bold">UID</th>
+                  <th className="px-6 py-4 font-bold text-right">ACTIONS</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/10 text-sm">
+                {filteredUsers.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="px-6 py-12 text-center text-text-tertiary">
+                      <Users className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                      <p className="font-medium text-sm">No users found matching the criteria.</p>
+                      {userSearchQuery && (
+                        <button 
+                          onClick={() => setUserSearchQuery("")}
+                          className="mt-2 text-xs text-emerald-600 dark:text-emerald-400 hover:underline"
+                        >
+                          Clear search filter
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ) : (
+                  filteredUsers.map((user, index) => (
+                    <tr 
+                      key={user.id || user.uid || index} 
+                      className="hover:bg-black/5 dark:hover:bg-white/5 transition-colors group"
+                    >
+                      {/* 1. ID Column: Sequential Display Number (1, 2, 3, etc.) */}
+                      <td className="px-6 py-4 font-mono font-bold text-xs text-text-tertiary">
+                        {index + 1}
+                      </td>
+
+                      {/* 2. Name Column */}
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs shrink-0 ${
+                            user.role === 'admin' 
+                              ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30' 
+                              : user.role === 'police' 
+                              ? 'bg-purple-500/20 text-purple-600 dark:text-purple-400 border border-purple-500/30' 
+                              : 'bg-blue-500/20 text-blue-600 dark:text-blue-400 border border-blue-500/30'
+                          }`}>
+                            {user.name ? user.name.charAt(0).toUpperCase() : 'U'}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="font-semibold text-sm text-text-primary leading-tight truncate">
+                              {user.name || "Unknown User"}
+                            </div>
+                            {user.stationName && (
+                              <div className="text-[10px] text-text-secondary truncate mt-0.5">
+                                {user.stationName} {user.rank ? `• ${user.rank}` : ""}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* 3. Email Column */}
+                      <td className="px-6 py-4 text-xs font-medium text-text-secondary">
+                        {user.email || "-"}
+                      </td>
+
+                      {/* 4. Role Column */}
+                      <td className="px-6 py-4">
+                        <span className={`inline-block px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border backdrop-blur-sm ${
+                          user.role === "admin" 
+                            ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20" 
+                            : user.role === "police" 
+                            ? "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20" 
+                            : "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20"
+                        }`}>
+                          {user.role || "Citizen"}
+                        </span>
+                      </td>
+
+                      {/* 5. Date of Join Column */}
+                      <td className="px-6 py-4 text-xs font-medium text-text-secondary whitespace-nowrap">
+                        {user.createdAt ? (
+                          new Date(user.createdAt).toLocaleDateString('en-US', {
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric'
+                          })
+                        ) : (
+                          <span className="text-text-tertiary italic">-</span>
+                        )}
+                      </td>
+
+                      {/* 6. UID Column: Visually smaller, compact, non-truncated */}
+                      <td className="px-6 py-4">
+                        <span 
+                          className="text-[11px] font-mono text-text-tertiary bg-ui-bg px-2 py-1 rounded border border-ui-border select-all inline-block max-w-[200px] truncate"
+                          title={user.uid}
+                        >
+                          {user.uid}
+                        </span>
+                      </td>
+
+                      {/* 7. Actions Column */}
+                      <td className="px-6 py-4 text-right whitespace-nowrap">
+                        {user.role === "citizen" && (
+                          <button 
+                            onClick={async () => {
+                              setIsProfileModalOpen(true);
+                              setFetchingProfile(true);
+                              const { profile } = await getUserProfile(user.uid);
+                              setSelectedCitizenProfile(profile);
+                              setFetchingProfile(false);
+                            }}
+                            className="inline-flex items-center gap-1.5 text-xs text-blue-700 dark:text-blue-300 hover:text-blue-800 dark:hover:text-blue-200 font-semibold bg-blue-500/10 hover:bg-blue-500/20 px-3 py-1.5 rounded-lg transition-colors border border-blue-500/20 backdrop-blur-sm"
+                            title="View KYC Profile"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                            View KYC
+                          </button>
+                        )}
+                        {user.role === "police" && (
+                          <button 
+                            onClick={async () => {
+                              setIsPoliceProfileModalOpen(true);
+                              setFetchingProfile(true);
+                              const { profile } = await getUserProfile(user.uid);
+                              setSelectedPoliceProfile({ ...user, ...profile });
+                              setFetchingProfile(false);
+                            }}
+                            className="inline-flex items-center gap-1.5 text-xs text-purple-700 dark:text-purple-300 hover:text-purple-800 dark:hover:text-purple-200 font-semibold bg-purple-500/10 hover:bg-purple-500/20 px-3 py-1.5 rounded-lg transition-colors border border-purple-500/20 backdrop-blur-sm"
+                            title="View Police Record"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                            View Record
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
     );
   };
