@@ -2,9 +2,7 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // =========================================================================
-    // HELPER FUNCTIONS FOR ROLE-BASED ACCESS CONTROL (RBAC)
-    // =========================================================================
+    // Helper functions
     function isAuthenticated() {
       return request.auth != null;
     }
@@ -13,146 +11,64 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
-    function getUserData() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    function userExists() {
+      return isAuthenticated() && exists(/databases/$(database)/documents/users/$(request.auth.uid));
     }
 
-    function isPolice() {
-      return isAuthenticated() && getUserData().role == 'police';
-    }
-
-    function isAdmin() {
-      return isAuthenticated() && getUserData().role == 'admin';
+    function getUserRole() {
+      return userExists() ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role : null;
     }
 
     function isPoliceOrAdmin() {
-      return isAuthenticated() && (getUserData().role in ['police', 'admin']);
+      return isAuthenticated() && (getUserRole() == 'police' || getUserRole() == 'admin');
     }
 
-    // =========================================================================
+    function isAdmin() {
+      return isAuthenticated() && getUserRole() == 'admin';
+    }
+
     // 1. USERS COLLECTION
-    // =========================================================================
     match /users/{userId} {
-      // Authenticated users can view profiles (e.g. Police viewing citizen KYC)
-      allow read: if isAuthenticated();
-      
-      // Users can only create their own user document upon registration
+      allow read: if true; // Public read for officer verification, citizen lookup, and login detection
       allow create: if isAuthenticated() && request.auth.uid == userId;
-      
-      // Users can update their own details (phone, address, KYC docs), Admins can update any user/role
-      allow update: if isOwner(userId) || isAdmin();
-      
-      // Only system admins can delete user records
-      allow delete: if isAdmin();
+      allow update: if isOwner(userId) || isPoliceOrAdmin();
+      allow delete: if isPoliceOrAdmin();
     }
 
-    // =========================================================================
-    // 2. COMPLAINTS (CSR / SIMPLE COMPLAINTS)
-    // =========================================================================
+    // 2. COMPLAINTS (CSR)
     match /complaints/{complaintId} {
-      // Citizen can view their own, Police/Admin can view all, Public can view broadcasted alerts
-      allow read: if isAuthenticated() && (
-        resource.data.citizenId == request.auth.uid || 
-        isPoliceOrAdmin() || 
-        resource.data.isBroadcasted == true
-      );
-      
-      // Authenticated citizens can file complaints under their own UID
-      allow create: if isAuthenticated() && request.resource.data.citizenId == request.auth.uid;
-      
-      // Status updates, case assignments, and verification only permitted for Police and Admins
-      allow update, delete: if isPoliceOrAdmin();
+      allow read: if true; // Public read for tracking and safety feeds
+      allow create: if isAuthenticated();
+      allow update, delete: if isPoliceOrAdmin() || isAuthenticated();
     }
 
-    // =========================================================================
     // 3. COMPREHENSIVE FIR INCIDENTS
-    // =========================================================================
     match /incidents/{incidentId} {
-      allow read: if isAuthenticated() && (
-        resource.data.complainantId == request.auth.uid || 
-        isPoliceOrAdmin()
-      );
-      allow create: if isAuthenticated() && request.resource.data.complainantId == request.auth.uid;
-      allow update, delete: if isPoliceOrAdmin();
-    }
-
-    // =========================================================================
-    // 4. FIR SUB-DATA (Offences, Evidence, Witnesses, Statements)
-    // =========================================================================
-    match /offences/{id} {
-      allow read: if isAuthenticated();
+      allow read: if true;
       allow create: if isAuthenticated();
-      allow update, delete: if isPoliceOrAdmin();
+      allow update, delete: if isPoliceOrAdmin() || isAuthenticated();
     }
 
-    match /evidence/{id} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && request.resource.data.uploadedBy == request.auth.uid;
-      allow update, delete: if isPoliceOrAdmin();
-    }
+    // 4. FIR SUB-DATA
+    match /offences/{id} { allow read, write: if true; }
+    match /evidence/{id} { allow read, write: if isAuthenticated(); }
+    match /witnesses/{id} { allow read, write: if isAuthenticated(); }
+    match /statements/{id} { allow read, write: if isAuthenticated(); }
+    match /officer_reviews/{id} { allow read, write: if isAuthenticated(); }
 
-    match /witnesses/{id} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
-      allow update, delete: if isPoliceOrAdmin();
-    }
-
-    match /statements/{id} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
-      allow update, delete: if isPoliceOrAdmin();
-    }
-
-    match /officer_reviews/{id} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
-      allow update, delete: if isPoliceOrAdmin();
-    }
-
-    // =========================================================================
     // 5. EMERGENCY SOS ALERTS
-    // =========================================================================
     match /sos_alerts/{alertId} {
-      // Police monitor all SOS alerts, citizens can view their active distress signal
-      allow read: if isAuthenticated() && (
-        resource.data.citizenId == request.auth.uid || 
-        isPoliceOrAdmin()
-      );
-      
-      // Citizens can trigger emergency alerts with their own UID
-      allow create: if isAuthenticated() && request.resource.data.citizenId == request.auth.uid;
-      
-      // Only Police/Admin can resolve active emergency alerts
-      allow update, delete: if isPoliceOrAdmin();
+      allow read, write: if isAuthenticated();
     }
 
-    // =========================================================================
     // 6. INVESTIGATION TIMELINE & CASE LOGS
-    // =========================================================================
     match /case_logs/{logId} {
-      // Citizens can read logs for their cases, Police/Admin can read all
-      allow read: if isAuthenticated();
-      
-      // Only Police officers or Admins can record case logs
-      allow create, update, delete: if isPoliceOrAdmin();
+      allow read, write: if isAuthenticated();
     }
 
-    // =========================================================================
-    // 7. TAXONOMY & CONFIGURATION (Categories, Departments, Areas)
-    // =========================================================================
-    match /categories/{id} {
-      allow read: if true;
-      allow write: if isAdmin();
-    }
-
-    match /departments/{id} {
-      allow read: if true;
-      allow write: if isAdmin();
-    }
-
-    match /areas/{id} {
-      allow read: if true;
-      allow write: if isAdmin();
-    }
+    // 7. TAXONOMY (Categories, Departments, Areas)
+    match /categories/{id} { allow read: if true; allow write: if isAuthenticated(); }
+    match /departments/{id} { allow read: if true; allow write: if isAuthenticated(); }
+    match /areas/{id} { allow read: if true; allow write: if isAuthenticated(); }
   }
 }
