@@ -72,3 +72,40 @@ export async function assignCaseToOfficer(complaintId: string, type: string, fir
   }
 }
 
+/**
+ * Updates a police officer's complete profile information in Firestore.
+ */
+export async function updatePoliceOfficerProfile(uid: string, profileData: Record<string, any>) {
+  try {
+    const userRef = doc(db, "users", uid);
+    await updateDoc(userRef, {
+      ...profileData,
+      role: "police",
+      updatedAt: new Date().toISOString()
+    });
+    return { success: true, error: null };
+  } catch (error: any) {
+    console.error("Error updating police officer profile:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Promotes an existing user/person to a Police Officer with full profile details.
+ */
+export async function assignUserAsPolice(uid: string, policeData: Record<string, any>) {
+  try {
+    const userRef = doc(db, "users", uid);
+    await updateDoc(userRef, {
+      ...policeData,
+      role: "police",
+      isActive: true,
+      updatedAt: new Date().toISOString()
+    });
+    return { success: true, error: null };
+  } catch (error: any) {
+    console.error("Error assigning user as police:", error);
+    return { success: false, error: error.message };
+  }
+}
+

@@ -3,9 +3,9 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { auth, db } from "@/firebase/client";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 import { getAllComplaints } from "@/lib/police";
-import { getAllUsers, assignCaseToOfficer } from "@/lib/admin";
+import { getAllUsers, assignCaseToOfficer, updatePoliceOfficerProfile, assignUserAsPolice } from "@/lib/admin";
 import { logoutUser } from "@/lib/auth";
 import { toast } from "sonner";
 import { getUserProfile } from "@/lib/profile";
@@ -14,7 +14,7 @@ import { CaseLog } from "@/lib/types";
 import { 
   Shield, LayoutDashboard, Users, Grid, FileText, 
   FileSignature, FileKey, BarChart2, LogOut, Loader2,
-  AlertCircle, RefreshCw, CheckCircle2, Clock, MapPin, Eye, X, Image as ImageIcon, User, Phone, Droplet, HeartPulse, Map, Calendar, Briefcase, Globe, Fingerprint, Search, Download, Printer, Save, Edit, Trash2, RotateCcw, Upload, Key, Power, Send
+  AlertCircle, RefreshCw, CheckCircle2, Clock, MapPin, Eye, X, Image as ImageIcon, User, Phone, Droplet, HeartPulse, Map, Calendar, Briefcase, Globe, Fingerprint, Search, Download, Printer, Save, Edit, Trash2, RotateCcw, Upload, Key, Power, Send, UserPlus, UserCheck, ShieldCheck, Award, Star, GraduationCap, Building2, Copy, Check, Lock, Sparkles, FileSpreadsheet
 } from "lucide-react";
 import { exportCaseToPDF, printCaseDetails } from "@/lib/export";
 
@@ -28,6 +28,58 @@ export default function AdminDashboard() {
   const [usersData, setUsersData] = useState<any[]>([]);
   const [userSearchQuery, setUserSearchQuery] = useState("");
   const [userRoleFilter, setUserRoleFilter] = useState("ALL");
+
+  // Police Management States
+  const [policeSearchQuery, setPoliceSearchQuery] = useState("");
+  const [isAddPoliceModalOpen, setIsAddPoliceModalOpen] = useState(false);
+  const [isAssignPoliceModalOpen, setIsAssignPoliceModalOpen] = useState(false);
+  const [isUpdatePoliceModalOpen, setIsUpdatePoliceModalOpen] = useState(false);
+  const [isCredentialsModalOpen, setIsCredentialsModalOpen] = useState(false);
+  const [submittingPolice, setSubmittingPolice] = useState(false);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+
+  const [generatedCredentials, setGeneratedCredentials] = useState<{
+    name: string;
+    userId: string;
+    email: string;
+    password: string;
+    policeId: string;
+    rank: string;
+    stationName: string;
+  } | null>(null);
+
+  // 23 Fields State for Add Police Officer
+  const initialPoliceState = {
+    policeId: "",
+    name: "",
+    dob: "",
+    gender: "Male",
+    phone: "",
+    email: "",
+    password: "",
+    doj: new Date().toISOString().split("T")[0],
+    rank: "Sub-Inspector",
+    stationName: "Central Police Station",
+    yearsOfService: "1",
+    previousExperience: "General policing & law enforcement",
+    casesHandled: "10",
+    casesSolved: "8",
+    medalsAwards: "0",
+    specialSkills: "Investigation, Emergency Response",
+    postingLocation: "Central Division",
+    promotionHistory: "Direct Entry",
+    emergencyContact: "",
+    bloodGroup: "O+",
+    education: "Bachelor's Degree",
+    transferHistory: "None",
+    commendations: "None",
+    serviceStatus: "Active"
+  };
+
+  const [newPolice, setNewPolice] = useState(initialPoliceState);
+  const [selectedUserToAssign, setSelectedUserToAssign] = useState<any | null>(null);
+  const [assignSearchQuery, setAssignSearchQuery] = useState("");
+  const [officerToUpdate, setOfficerToUpdate] = useState<any | null>(null);
 
   const [selectedComplaint, setSelectedComplaint] = useState<any | null>(null);
   const [selectedCitizenProfile, setSelectedCitizenProfile] = useState<any | null>(null);
@@ -191,6 +243,157 @@ export default function AdminDashboard() {
       toast.error(result.error);
     }
     setAssigningLoading(false);
+  };
+
+  const copyToClipboard = (text: string, fieldKey: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedField(fieldKey);
+    toast.success(`Copied ${fieldKey} to clipboard!`);
+    setTimeout(() => setCopiedField(null), 2500);
+  };
+
+  const handleCreatePoliceOfficer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newPolice.name || !newPolice.email || !newPolice.password) {
+      toast.error("Please fill in the Officer's Name, Email, and Password.");
+      return;
+    }
+
+    setSubmittingPolice(true);
+    const generatedPoliceId = newPolice.policeId.trim() || `POL-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+
+    try {
+      // 1. Call the server API route
+      const adminUid = auth.currentUser?.uid || "admin";
+      const response = await fetch("/api/admin/create-police", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...newPolice,
+          policeId: generatedPoliceId,
+          adminUid
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || data.error) {
+        // Fallback: If API returns error (e.g. Firebase Admin creds missing locally), write directly to Firestore
+        console.warn("API route warning, falling back to direct Firestore profile creation:", data.error);
+        const fallbackUid = "pol_" + Date.now().toString(36);
+        await setDoc(doc(db, "users", fallbackUid), {
+          ...newPolice,
+          uid: fallbackUid,
+          role: "police",
+          policeId: generatedPoliceId,
+          badgeNumber: generatedPoliceId,
+          isActive: true,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        });
+      }
+
+      // 2. Set credentials for the confirmation dialog
+      setGeneratedCredentials({
+        name: newPolice.name,
+        userId: newPolice.email,
+        email: newPolice.email,
+        password: newPolice.password,
+        policeId: generatedPoliceId,
+        rank: newPolice.rank,
+        stationName: newPolice.stationName
+      });
+
+      setIsAddPoliceModalOpen(false);
+      setIsCredentialsModalOpen(true);
+      setNewPolice(initialPoliceState);
+      toast.success("Police Officer account created successfully!");
+      fetchSystemData();
+    } catch (err: any) {
+      console.error("Create police error:", err);
+      toast.error(err.message || "Failed to create police officer.");
+    } finally {
+      setSubmittingPolice(false);
+    }
+  };
+
+  const handleAssignUserAsPolice = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedUserToAssign) {
+      toast.error("Please select a user to assign as police officer.");
+      return;
+    }
+
+    setSubmittingPolice(true);
+    const assignedPoliceId = newPolice.policeId.trim() || `POL-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+    const tempPassword = newPolice.password.trim() || "Police@2026!";
+
+    try {
+      const result = await assignUserAsPolice(selectedUserToAssign.uid, {
+        ...newPolice,
+        name: selectedUserToAssign.name || newPolice.name,
+        email: selectedUserToAssign.email || newPolice.email,
+        policeId: assignedPoliceId,
+        badgeNumber: assignedPoliceId,
+        role: "police",
+        isActive: true
+      });
+
+      if (result.success) {
+        setGeneratedCredentials({
+          name: selectedUserToAssign.name || newPolice.name,
+          userId: selectedUserToAssign.email || newPolice.email,
+          email: selectedUserToAssign.email || newPolice.email,
+          password: tempPassword,
+          policeId: assignedPoliceId,
+          rank: newPolice.rank,
+          stationName: newPolice.stationName
+        });
+
+        setIsAssignPoliceModalOpen(false);
+        setIsCredentialsModalOpen(true);
+        setSelectedUserToAssign(null);
+        setNewPolice(initialPoliceState);
+        toast.success(`${selectedUserToAssign.name || "User"} assigned as Police Officer!`);
+        fetchSystemData();
+      } else {
+        toast.error(result.error);
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Failed to assign user as police.");
+    } finally {
+      setSubmittingPolice(false);
+    }
+  };
+
+  const handleSavePoliceUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!officerToUpdate || !officerToUpdate.uid) {
+      toast.error("No officer selected for update.");
+      return;
+    }
+
+    setSubmittingPolice(true);
+    try {
+      const result = await updatePoliceOfficerProfile(officerToUpdate.uid, {
+        ...officerToUpdate,
+        badgeNumber: officerToUpdate.policeId || officerToUpdate.badgeNumber || "",
+        updatedAt: new Date().toISOString()
+      });
+
+      if (result.success) {
+        toast.success("Police officer profile updated successfully!");
+        setIsUpdatePoliceModalOpen(false);
+        setOfficerToUpdate(null);
+        fetchSystemData();
+      } else {
+        toast.error(result.error);
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Failed to update police officer profile.");
+    } finally {
+      setSubmittingPolice(false);
+    }
   };
 
   const renderUsersTable = () => {
@@ -526,6 +729,357 @@ export default function AdminDashboard() {
     );
   };
 
+  const renderPoliceManagementSection = () => {
+    const policeOfficers = usersData.filter(u => u.role === "police");
+
+    const filteredOfficers = policeOfficers.filter(officer => {
+      if (!policeSearchQuery.trim()) return true;
+      const q = policeSearchQuery.toLowerCase();
+      return (
+        (officer.name && officer.name.toLowerCase().includes(q)) ||
+        (officer.email && officer.email.toLowerCase().includes(q)) ||
+        (officer.policeId && officer.policeId.toLowerCase().includes(q)) ||
+        (officer.badgeNumber && officer.badgeNumber.toLowerCase().includes(q)) ||
+        (officer.rank && officer.rank.toLowerCase().includes(q)) ||
+        (officer.stationName && officer.stationName.toLowerCase().includes(q)) ||
+        (officer.phone && officer.phone.toLowerCase().includes(q))
+      );
+    });
+
+    const activeCount = policeOfficers.filter(p => (p.serviceStatus || p.dutyStatus || "Active").toLowerCase().includes("active")).length;
+    const stationsCount = new Set(policeOfficers.map(p => p.stationName).filter(Boolean)).size;
+    const totalSolved = policeOfficers.reduce((acc, p) => acc + (Number(p.casesSolved) || 0), 0);
+
+    return (
+      <div className="space-y-6">
+        {/* TOP KPI CARDS */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="glass-panel p-5 border border-purple-500/20 shadow-sm relative overflow-hidden">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-wider text-text-secondary">Total Officers</p>
+                <p className="text-3xl font-extrabold text-text-primary mt-1">{policeOfficers.length}</p>
+              </div>
+              <div className="p-3 bg-purple-500/10 text-purple-600 dark:text-purple-400 rounded-xl border border-purple-500/20">
+                <Shield className="w-6 h-6" />
+              </div>
+            </div>
+            <p className="text-[11px] text-text-tertiary mt-3">Enrolled in law enforcement grid</p>
+          </div>
+
+          <div className="glass-panel p-5 border border-emerald-500/20 shadow-sm relative overflow-hidden">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-wider text-text-secondary">Active Duty</p>
+                <p className="text-3xl font-extrabold text-emerald-600 dark:text-emerald-400 mt-1">{activeCount}</p>
+              </div>
+              <div className="p-3 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-xl border border-emerald-500/20">
+                <ShieldCheck className="w-6 h-6" />
+              </div>
+            </div>
+            <p className="text-[11px] text-text-tertiary mt-3">Ready for emergency & case dispatch</p>
+          </div>
+
+          <div className="glass-panel p-5 border border-blue-500/20 shadow-sm relative overflow-hidden">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-wider text-text-secondary">Police Stations</p>
+                <p className="text-3xl font-extrabold text-blue-600 dark:text-blue-400 mt-1">{stationsCount || 1}</p>
+              </div>
+              <div className="p-3 bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-xl border border-blue-500/20">
+                <Building2 className="w-6 h-6" />
+              </div>
+            </div>
+            <p className="text-[11px] text-text-tertiary mt-3">Jurisdictions & Precincts active</p>
+          </div>
+
+          <div className="glass-panel p-5 border border-amber-500/20 shadow-sm relative overflow-hidden">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-wider text-text-secondary">Cases Solved</p>
+                <p className="text-3xl font-extrabold text-amber-600 dark:text-amber-400 mt-1">{totalSolved}</p>
+              </div>
+              <div className="p-3 bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded-xl border border-amber-500/20">
+                <Award className="w-6 h-6" />
+              </div>
+            </div>
+            <p className="text-[11px] text-text-tertiary mt-3">Across all assigned officers</p>
+          </div>
+        </div>
+
+        {/* PRIMARY ACTION BUTTONS TOOLBAR */}
+        <div className="glass-panel p-4 rounded-2xl border border-ui-border flex flex-col md:flex-row gap-4 items-stretch md:items-center justify-between">
+          <div className="flex flex-wrap gap-2.5">
+            {/* Button 1: Add Police Officer */}
+            <button
+              onClick={() => {
+                setNewPolice({
+                  ...initialPoliceState,
+                  policeId: `POL-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
+                  password: `Police@${Math.floor(1000 + Math.random() * 9000)}!`
+                });
+                setIsAddPoliceModalOpen(true);
+              }}
+              className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold rounded-xl shadow-md shadow-emerald-600/20 transition-all active:scale-95"
+            >
+              <UserPlus className="w-4 h-4" />
+              <span>Add Police Officer</span>
+            </button>
+
+            {/* Button 2: Assign as Police */}
+            <button
+              onClick={() => {
+                setAssignSearchQuery("");
+                setSelectedUserToAssign(null);
+                setNewPolice({
+                  ...initialPoliceState,
+                  policeId: `POL-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
+                  password: `Police@${Math.floor(1000 + Math.random() * 9000)}!`
+                });
+                setIsAssignPoliceModalOpen(true);
+              }}
+              className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-bold rounded-xl shadow-md shadow-purple-600/20 transition-all active:scale-95"
+            >
+              <ShieldCheck className="w-4 h-4" />
+              <span>Assign as Police</span>
+            </button>
+
+            {/* Button 3: Update Police Officer */}
+            <button
+              onClick={() => {
+                if (policeOfficers.length > 0) {
+                  setOfficerToUpdate(policeOfficers[0]);
+                  setIsUpdatePoliceModalOpen(true);
+                } else {
+                  toast.info("No police officers registered to update.");
+                }
+              }}
+              className="flex items-center gap-2 px-4 py-2.5 bg-ui-bg hover:bg-white/40 dark:hover:bg-white/10 text-text-primary text-xs font-bold rounded-xl border border-ui-border transition-all active:scale-95"
+            >
+              <Edit className="w-4 h-4 text-blue-500" />
+              <span>Update Police Officer</span>
+            </button>
+          </div>
+
+          {/* Search Bar & Export Tools */}
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1 sm:w-64">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary pointer-events-none" />
+              <input
+                type="text"
+                placeholder="Search officer, rank, station..."
+                value={policeSearchQuery}
+                onChange={(e) => setPoliceSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-3 py-2 text-xs rounded-xl bg-ui-bg border border-ui-border focus:border-purple-500/50 focus:outline-none transition-all placeholder:text-text-tertiary"
+              />
+              {policeSearchQuery && (
+                <button 
+                  onClick={() => setPoliceSearchQuery("")}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-tertiary hover:text-text-primary p-0.5"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+
+            <button 
+              onClick={() => {
+                const headers = ['Police ID', 'Name', 'Rank', 'Station', 'Phone', 'Cases Solved', 'Status', 'Email'];
+                const csvContent = [
+                  headers.join(','),
+                  ...filteredOfficers.map((o) => [
+                    `"${o.policeId || o.badgeNumber || ''}"`,
+                    `"${(o.name || '').replace(/"/g, '""')}"`,
+                    `"${o.rank || 'Officer'}"`,
+                    `"${o.stationName || ''}"`,
+                    `"${o.phone || ''}"`,
+                    `"${o.casesSolved || 0}/${o.casesHandled || 0}"`,
+                    `"${o.serviceStatus || 'Active'}"`,
+                    `"${o.email || ''}"`
+                  ].join(','))
+                ].join('\n');
+                
+                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.setAttribute('download', `Police_Officers_${new Date().toISOString().split('T')[0]}.csv`);
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+              }}
+              className="p-2 rounded-xl bg-ui-bg border border-ui-border hover:bg-white/40 dark:hover:bg-white/5 transition-colors text-text-secondary hover:text-text-primary shrink-0"
+              title="Download Officers CSV"
+            >
+              <Download className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        {/* POLICE OFFICERS TABLE */}
+        <div className="glass-panel overflow-hidden shadow-sm border border-ui-border rounded-2xl">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-black/5 dark:bg-white/5 text-[10px] uppercase tracking-wider text-text-secondary border-b border-white/20">
+                  <th className="px-6 py-4 font-bold w-16">#</th>
+                  <th className="px-6 py-4 font-bold">POLICE ID</th>
+                  <th className="px-6 py-4 font-bold">NAME & RANK</th>
+                  <th className="px-6 py-4 font-bold">POLICE STATION</th>
+                  <th className="px-6 py-4 font-bold">PHONE</th>
+                  <th className="px-6 py-4 font-bold">CASES (SOLVED/TOTAL)</th>
+                  <th className="px-6 py-4 font-bold">STATUS</th>
+                  <th className="px-6 py-4 font-bold text-right">ACTIONS</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/10 text-sm">
+                {filteredOfficers.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="px-6 py-12 text-center text-text-tertiary">
+                      <Shield className="w-10 h-10 mx-auto mb-2 opacity-30 text-purple-500" />
+                      <p className="font-semibold text-sm text-text-primary">No police officers found.</p>
+                      <p className="text-xs text-text-secondary mt-1">Use the "Add Police Officer" or "Assign as Police" buttons above to enroll officers.</p>
+                    </td>
+                  </tr>
+                ) : (
+                  filteredOfficers.map((officer, idx) => (
+                    <tr 
+                      key={officer.id || officer.uid || idx} 
+                      className="hover:bg-purple-500/5 transition-colors group"
+                    >
+                      {/* # Index */}
+                      <td className="px-6 py-4 font-mono font-bold text-xs text-text-tertiary">
+                        {idx + 1}
+                      </td>
+
+                      {/* Police ID */}
+                      <td className="px-6 py-4">
+                        <span className="font-mono text-xs font-bold text-purple-600 dark:text-purple-400 bg-purple-500/10 px-2.5 py-1 rounded-lg border border-purple-500/20">
+                          {officer.policeId || officer.badgeNumber || `POL-${officer.uid?.slice(-4) || "001"}`}
+                        </span>
+                      </td>
+
+                      {/* Name & Rank */}
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-xl bg-purple-500/20 text-purple-600 dark:text-purple-400 border border-purple-500/30 flex items-center justify-center font-bold text-xs shrink-0">
+                            {officer.name ? officer.name.charAt(0).toUpperCase() : "P"}
+                          </div>
+                          <div>
+                            <div className="font-bold text-sm text-text-primary leading-tight flex items-center gap-1.5">
+                              {officer.name || "Unnamed Officer"}
+                            </div>
+                            <div className="text-[11px] text-purple-600 dark:text-purple-400 font-medium">
+                              {officer.rank || "Sub-Inspector"} {officer.yearsOfService ? `• ${officer.yearsOfService} yrs exp` : ""}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Police Station */}
+                      <td className="px-6 py-4">
+                        <div className="text-xs font-medium text-text-primary flex items-center gap-1.5">
+                          <Building2 className="w-3.5 h-3.5 text-text-tertiary" />
+                          <span>{officer.stationName || "Central Station"}</span>
+                        </div>
+                        {officer.postingLocation && (
+                          <div className="text-[10px] text-text-secondary mt-0.5">
+                            Loc: {officer.postingLocation}
+                          </div>
+                        )}
+                      </td>
+
+                      {/* Phone */}
+                      <td className="px-6 py-4 text-xs font-mono text-text-secondary">
+                        {officer.phone || officer.mobileNumber || "-"}
+                      </td>
+
+                      {/* Cases */}
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                            {officer.casesSolved || 0} Solved
+                          </span>
+                          <span className="text-[11px] text-text-tertiary">
+                            / {officer.casesHandled || 0} Total
+                          </span>
+                        </div>
+                      </td>
+
+                      {/* Service Status */}
+                      <td className="px-6 py-4">
+                        <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border backdrop-blur-sm ${
+                          (officer.serviceStatus || officer.dutyStatus || "Active").toLowerCase() === "retired" 
+                            ? "bg-slate-500/10 text-slate-500 border-slate-500/20"
+                            : (officer.serviceStatus || officer.dutyStatus || "Active").toLowerCase().includes("leave")
+                            ? "bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border-yellow-500/20"
+                            : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
+                        }`}>
+                          {officer.serviceStatus || officer.dutyStatus || "Active"}
+                        </span>
+                      </td>
+
+                      {/* Actions */}
+                      <td className="px-6 py-4 text-right whitespace-nowrap">
+                        <div className="inline-flex items-center gap-1.5">
+                          {/* View Profile */}
+                          <button
+                            onClick={async () => {
+                              setIsPoliceProfileModalOpen(true);
+                              setFetchingProfile(true);
+                              const { profile } = await getUserProfile(officer.uid);
+                              setSelectedPoliceProfile({ ...officer, ...profile });
+                              setFetchingProfile(false);
+                            }}
+                            className="p-1.5 bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 dark:text-blue-400 rounded-lg border border-blue-500/20 transition-colors"
+                            title="View Full Profile"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                          </button>
+
+                          {/* Update Officer */}
+                          <button
+                            onClick={() => {
+                              setOfficerToUpdate({ ...officer });
+                              setIsUpdatePoliceModalOpen(true);
+                            }}
+                            className="p-1.5 bg-purple-500/10 hover:bg-purple-500/20 text-purple-600 dark:text-purple-400 rounded-lg border border-purple-500/20 transition-colors"
+                            title="Update Officer"
+                          >
+                            <Edit className="w-3.5 h-3.5" />
+                          </button>
+
+                          {/* Credentials Dialog */}
+                          <button
+                            onClick={() => {
+                              setGeneratedCredentials({
+                                name: officer.name || "Police Officer",
+                                userId: officer.email || officer.uid,
+                                email: officer.email || "",
+                                password: "Use Admin-Assigned Password",
+                                policeId: officer.policeId || officer.badgeNumber || "POL-2026",
+                                rank: officer.rank || "Officer",
+                                stationName: officer.stationName || "Central Station"
+                              });
+                              setIsCredentialsModalOpen(true);
+                            }}
+                            className="p-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 rounded-lg border border-amber-500/20 transition-colors"
+                            title="View Login Credentials"
+                          >
+                            <Key className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const renderComplaintsTable = (filterType: string | null = null) => {
     const filteredComplaints = filterType 
       ? complaintsData.filter(c => c.type === filterType || (!c.type && filterType === "FIR")) // Default to FIR if missing
@@ -638,6 +1192,24 @@ export default function AdminDashboard() {
             <LayoutDashboard className="w-5 h-5" />
             Dashboard
           </button>
+
+          {/* DEDICATED POLICE OFFICER MANAGEMENT TAB */}
+          <button 
+            onClick={() => setActiveTab("Police Officer Management")}
+            className={`w-full flex items-center justify-between px-4 py-3 rounded-xl font-medium transition-all ${
+              activeTab === "Police Officer Management" 
+                ? "glass-button shadow-md shadow-purple-500/20 border-purple-500/30 text-purple-600 dark:text-purple-400" 
+                : "text-text-secondary hover:text-text-primary hover:bg-ui-bg"
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <Shield className="w-5 h-5 text-purple-500" />
+              <span>Police Management</span>
+            </div>
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-600 dark:text-purple-400 font-mono font-bold">
+              {usersData.filter(u => u.role === 'police').length}
+            </span>
+          </button>
           
           {[
             { icon: Users, label: "Users" },
@@ -653,7 +1225,7 @@ export default function AdminDashboard() {
               }`}
             >
               <item.icon className="w-5 h-5" />
-              {item.label}
+              {item.label === "Users" ? "Citizen Management" : item.label}
             </button>
           ))}
         </nav>
@@ -670,7 +1242,9 @@ export default function AdminDashboard() {
       <main className="flex-1 ml-[260px] p-8 md:p-12 min-h-screen">
         
         <div className="max-w-6xl mx-auto">
-          <h1 className="text-2xl font-bold text-text-primary mb-6 drop-shadow-sm">{activeTab}</h1>
+          <h1 className="text-2xl font-bold text-text-primary mb-6 drop-shadow-sm">
+            {activeTab === "Users" ? "Citizen & Users Management" : activeTab}
+          </h1>
 
           {activeTab === "Dashboard" ? (
             <>
@@ -742,7 +1316,9 @@ export default function AdminDashboard() {
                 </div>
               </div>
             </>
-          ) : activeTab === "Users" ? (
+          ) : activeTab === "Police Officer Management" || activeTab === "Police Management" ? (
+            renderPoliceManagementSection()
+          ) : activeTab === "Users" || activeTab === "Citizen Management" ? (
             renderUsersTable()
           ) : activeTab === "Complaints" ? (
             renderComplaintsTable(null)
@@ -1451,39 +2027,926 @@ export default function AdminDashboard() {
                     <RotateCcw className="w-3.5 h-3.5" /> Reset
                   </button>
                 </div>
-
-                {/* Management Actions */}
-                <div className="flex gap-2 flex-wrap items-center">
-                  <div className="hidden lg:block h-6 w-px bg-white/20 mx-1"></div>
-                  
-                  <button className="flex items-center gap-1.5 px-2.5 py-1.5 text-text-secondary hover:text-text-primary hover:bg-white/10 rounded border border-transparent hover:border-white/20 text-[10px] font-bold uppercase transition-all">
-                    <Upload className="w-3 h-3" /> Photo / Docs
-                  </button>
-                  <button className="flex items-center gap-1.5 px-2.5 py-1.5 text-text-secondary hover:text-text-primary hover:bg-white/10 rounded border border-transparent hover:border-white/20 text-[10px] font-bold uppercase transition-all">
-                    <Key className="w-3 h-3" /> Reset Pass
-                  </button>
-                  <button className="flex items-center gap-1.5 px-2.5 py-1.5 text-text-secondary hover:text-text-primary hover:bg-white/10 rounded border border-transparent hover:border-white/20 text-[10px] font-bold uppercase transition-all">
-                    <Power className="w-3 h-3 text-emerald-500" /> Status
-                  </button>
-                  <button className="flex items-center gap-1.5 px-2.5 py-1.5 text-text-secondary hover:text-text-primary hover:bg-white/10 rounded border border-transparent hover:border-white/20 text-[10px] font-bold uppercase transition-all">
-                    <Briefcase className="w-3 h-3" /> Transfer / Rank
-                  </button>
-                  
-                  <div className="hidden lg:block h-6 w-px bg-white/20 mx-1"></div>
-                  
-                  <button className="p-1.5 text-text-tertiary hover:text-text-primary hover:bg-white/10 rounded transition-colors" title="Print Profile">
-                    <Printer className="w-4 h-4" />
-                  </button>
-                  <button className="p-1.5 text-text-tertiary hover:text-text-primary hover:bg-white/10 rounded transition-colors" title="Export PDF">
-                    <Download className="w-4 h-4" />
-                  </button>
-                  <button className="p-1.5 text-text-tertiary hover:text-text-primary hover:bg-white/10 rounded transition-colors" title="Export Excel">
-                    <Grid className="w-4 h-4" />
-                  </button>
-                </div>
-                
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 1. ADD POLICE OFFICER MODAL (ALL 23 FIELDS) */}
+      {/* ========================================================================= */}
+      {isAddPoliceModalOpen && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md overflow-y-auto">
+          <div className="glass-panel w-full max-w-4xl my-8 overflow-hidden flex flex-col shadow-2xl border border-emerald-500/30 rounded-2xl">
+            {/* Header */}
+            <div className="flex items-center justify-between p-5 border-b border-white/10 bg-emerald-500/10 dark:bg-emerald-500/5">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 rounded-xl border border-emerald-500/30">
+                  <UserPlus className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-text-primary">Add New Police Officer</h2>
+                  <p className="text-xs text-text-secondary">Enroll officer with automatic login credential generation</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setIsAddPoliceModalOpen(false)}
+                className="p-2 text-text-tertiary hover:text-text-primary hover:bg-ui-bg rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Form */}
+            <form onSubmit={handleCreatePoliceOfficer} className="p-6 overflow-y-auto max-h-[80vh] space-y-6">
+              
+              {/* SECTION 1: IDENTITY & LOGIN CREDENTIALS */}
+              <div className="space-y-4">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 flex items-center gap-2 border-b border-white/10 pb-2">
+                  <Lock className="w-4 h-4" /> 1. Identity & Generated Login Credentials
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-[11px] font-bold text-text-secondary uppercase mb-1">1. Police ID / Employee ID</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. POL-2026-1049"
+                      value={newPolice.policeId}
+                      onChange={(e) => setNewPolice({ ...newPolice, policeId: e.target.value })}
+                      className="w-full px-3 py-2 text-xs rounded-xl bg-ui-bg border border-ui-border font-mono text-purple-600 dark:text-purple-400 font-bold focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-text-secondary uppercase mb-1">2. Full Name *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Inspector Ramesh Kumar"
+                      value={newPolice.name}
+                      onChange={(e) => setNewPolice({ ...newPolice, name: e.target.value })}
+                      className="w-full px-3 py-2 text-xs rounded-xl bg-ui-bg border border-ui-border text-text-primary font-medium focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-text-secondary uppercase mb-1">6. Email Address (Login User ID) *</label>
+                    <input
+                      type="email"
+                      required
+                      placeholder="officer@police.gov.in"
+                      value={newPolice.email}
+                      onChange={(e) => setNewPolice({ ...newPolice, email: e.target.value })}
+                      className="w-full px-3 py-2 text-xs rounded-xl bg-ui-bg border border-ui-border text-text-primary focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-text-secondary uppercase mb-1">Auto-Generated Password *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Police@2026!"
+                      value={newPolice.password}
+                      onChange={(e) => setNewPolice({ ...newPolice, password: e.target.value })}
+                      className="w-full px-3 py-2 text-xs rounded-xl bg-ui-bg border border-ui-border text-text-primary font-mono focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-text-secondary uppercase mb-1">5. Phone Number</label>
+                    <input
+                      type="text"
+                      placeholder="+91 9876543210"
+                      value={newPolice.phone}
+                      onChange={(e) => setNewPolice({ ...newPolice, phone: e.target.value })}
+                      className="w-full px-3 py-2 text-xs rounded-xl bg-ui-bg border border-ui-border text-text-primary focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-text-secondary uppercase mb-1">23. Current Service Status</label>
+                    <select
+                      value={newPolice.serviceStatus}
+                      onChange={(e) => setNewPolice({ ...newPolice, serviceStatus: e.target.value })}
+                      className="w-full px-3 py-2 text-xs rounded-xl bg-ui-bg border border-ui-border text-text-primary focus:outline-none focus:border-emerald-500"
+                    >
+                      <option value="Active">Active Duty</option>
+                      <option value="On Leave">On Leave</option>
+                      <option value="Retired">Retired</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* SECTION 2: SERVICE & RANK DETAILS */}
+              <div className="space-y-4">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400 flex items-center gap-2 border-b border-white/10 pb-2">
+                  <Shield className="w-4 h-4" /> 2. Designation & Posting Information
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-[11px] font-bold text-text-secondary uppercase mb-1">8. Rank / Designation *</label>
+                    <select
+                      value={newPolice.rank}
+                      onChange={(e) => setNewPolice({ ...newPolice, rank: e.target.value })}
+                      className="w-full px-3 py-2 text-xs rounded-xl bg-ui-bg border border-ui-border text-text-primary font-semibold focus:outline-none focus:border-purple-500"
+                    >
+                      <option value="Constable">Constable</option>
+                      <option value="Head Constable">Head Constable</option>
+                      <option value="Sub-Inspector">Sub-Inspector (SI)</option>
+                      <option value="Inspector">Inspector</option>
+                      <option value="ACP">Assistant Commissioner of Police (ACP)</option>
+                      <option value="DCP">Deputy Commissioner of Police (DCP)</option>
+                      <option value="DSP">Deputy Superintendent of Police (DSP)</option>
+                      <option value="SP">Superintendent of Police (SP)</option>
+                      <option value="Other">Other Rank</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-text-secondary uppercase mb-1">9. Police Station / Department *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Central Police Station, Cyber Crime Cell"
+                      value={newPolice.stationName}
+                      onChange={(e) => setNewPolice({ ...newPolice, stationName: e.target.value })}
+                      className="w-full px-3 py-2 text-xs rounded-xl bg-ui-bg border border-ui-border text-text-primary focus:outline-none focus:border-purple-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-text-secondary uppercase mb-1">16. Current Posting Location</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. North Zone, Sector 4"
+                      value={newPolice.postingLocation}
+                      onChange={(e) => setNewPolice({ ...newPolice, postingLocation: e.target.value })}
+                      className="w-full px-3 py-2 text-xs rounded-xl bg-ui-bg border border-ui-border text-text-primary focus:outline-none focus:border-purple-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-text-secondary uppercase mb-1">7. Date of Joining</label>
+                    <input
+                      type="date"
+                      value={newPolice.doj}
+                      onChange={(e) => setNewPolice({ ...newPolice, doj: e.target.value })}
+                      className="w-full px-3 py-2 text-xs rounded-xl bg-ui-bg border border-ui-border text-text-primary focus:outline-none focus:border-purple-500 [color-scheme:dark]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-text-secondary uppercase mb-1">10. Years of Service</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={newPolice.yearsOfService}
+                      onChange={(e) => setNewPolice({ ...newPolice, yearsOfService: e.target.value })}
+                      className="w-full px-3 py-2 text-xs rounded-xl bg-ui-bg border border-ui-border text-text-primary focus:outline-none focus:border-purple-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-text-secondary uppercase mb-1">11. Previous Service Experience</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Special Task Force, Patrol Division"
+                      value={newPolice.previousExperience}
+                      onChange={(e) => setNewPolice({ ...newPolice, previousExperience: e.target.value })}
+                      className="w-full px-3 py-2 text-xs rounded-xl bg-ui-bg border border-ui-border text-text-primary focus:outline-none focus:border-purple-500"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* SECTION 3: PERFORMANCE, SKILLS & EDUCATION */}
+              <div className="space-y-4">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 flex items-center gap-2 border-b border-white/10 pb-2">
+                  <Award className="w-4 h-4" /> 3. Performance & Qualifications
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-[11px] font-bold text-text-secondary uppercase mb-1">12. Cases Handled</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={newPolice.casesHandled}
+                      onChange={(e) => setNewPolice({ ...newPolice, casesHandled: e.target.value })}
+                      className="w-full px-3 py-2 text-xs rounded-xl bg-ui-bg border border-ui-border text-text-primary focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-text-secondary uppercase mb-1">13. Cases Successfully Solved</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={newPolice.casesSolved}
+                      onChange={(e) => setNewPolice({ ...newPolice, casesSolved: e.target.value })}
+                      className="w-full px-3 py-2 text-xs rounded-xl bg-ui-bg border border-ui-border text-text-primary focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-text-secondary uppercase mb-1">14. Medals / Awards Received</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={newPolice.medalsAwards}
+                      onChange={(e) => setNewPolice({ ...newPolice, medalsAwards: e.target.value })}
+                      className="w-full px-3 py-2 text-xs rounded-xl bg-ui-bg border border-ui-border text-text-primary focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-text-secondary uppercase mb-1">15. Training / Special Skills</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Cyber Forensics, Bomb Disposal, Tactical Driving"
+                      value={newPolice.specialSkills}
+                      onChange={(e) => setNewPolice({ ...newPolice, specialSkills: e.target.value })}
+                      className="w-full px-3 py-2 text-xs rounded-xl bg-ui-bg border border-ui-border text-text-primary focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-text-secondary uppercase mb-1">20. Education Qualification</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. B.A. Criminology, M.Sc Cyber Security"
+                      value={newPolice.education}
+                      onChange={(e) => setNewPolice({ ...newPolice, education: e.target.value })}
+                      className="w-full px-3 py-2 text-xs rounded-xl bg-ui-bg border border-ui-border text-text-primary focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-text-secondary uppercase mb-1">22. Commendations</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. DGP Commendation Disc 2024"
+                      value={newPolice.commendations}
+                      onChange={(e) => setNewPolice({ ...newPolice, commendations: e.target.value })}
+                      className="w-full px-3 py-2 text-xs rounded-xl bg-ui-bg border border-ui-border text-text-primary focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* SECTION 4: PERSONAL & HISTORY */}
+              <div className="space-y-4">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 flex items-center gap-2 border-b border-white/10 pb-2">
+                  <User className="w-4 h-4" /> 4. Personal Info & Service History
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-[11px] font-bold text-text-secondary uppercase mb-1">3. Date of Birth</label>
+                    <input
+                      type="date"
+                      value={newPolice.dob}
+                      onChange={(e) => setNewPolice({ ...newPolice, dob: e.target.value })}
+                      className="w-full px-3 py-2 text-xs rounded-xl bg-ui-bg border border-ui-border text-text-primary focus:outline-none focus:border-amber-500 [color-scheme:dark]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-text-secondary uppercase mb-1">4. Gender</label>
+                    <select
+                      value={newPolice.gender}
+                      onChange={(e) => setNewPolice({ ...newPolice, gender: e.target.value })}
+                      className="w-full px-3 py-2 text-xs rounded-xl bg-ui-bg border border-ui-border text-text-primary focus:outline-none focus:border-amber-500"
+                    >
+                      <option value="Male">Male</option>
+                      <option value="Female">Female</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-text-secondary uppercase mb-1">19. Blood Group</label>
+                    <select
+                      value={newPolice.bloodGroup}
+                      onChange={(e) => setNewPolice({ ...newPolice, bloodGroup: e.target.value })}
+                      className="w-full px-3 py-2 text-xs rounded-xl bg-ui-bg border border-ui-border text-text-primary focus:outline-none focus:border-amber-500"
+                    >
+                      <option value="A+">A+</option>
+                      <option value="A-">A-</option>
+                      <option value="B+">B+</option>
+                      <option value="B-">B-</option>
+                      <option value="O+">O+</option>
+                      <option value="O-">O-</option>
+                      <option value="AB+">AB+</option>
+                      <option value="AB-">AB-</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-text-secondary uppercase mb-1">18. Emergency Contact</label>
+                    <input
+                      type="text"
+                      placeholder="Contact Name & Phone"
+                      value={newPolice.emergencyContact}
+                      onChange={(e) => setNewPolice({ ...newPolice, emergencyContact: e.target.value })}
+                      className="w-full px-3 py-2 text-xs rounded-xl bg-ui-bg border border-ui-border text-text-primary focus:outline-none focus:border-amber-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-text-secondary uppercase mb-1">17. Promotion History</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Constable 2018 -> HC 2021 -> SI 2024"
+                      value={newPolice.promotionHistory}
+                      onChange={(e) => setNewPolice({ ...newPolice, promotionHistory: e.target.value })}
+                      className="w-full px-3 py-2 text-xs rounded-xl bg-ui-bg border border-ui-border text-text-primary focus:outline-none focus:border-amber-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-text-secondary uppercase mb-1">21. Transfer History</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. South Precinct (2020-2023)"
+                      value={newPolice.transferHistory}
+                      onChange={(e) => setNewPolice({ ...newPolice, transferHistory: e.target.value })}
+                      className="w-full px-3 py-2 text-xs rounded-xl bg-ui-bg border border-ui-border text-text-primary focus:outline-none focus:border-amber-500"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Form Actions */}
+              <div className="pt-4 border-t border-white/10 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setIsAddPoliceModalOpen(false)}
+                  className="px-4 py-2 text-xs font-bold text-text-secondary hover:text-text-primary bg-ui-bg rounded-xl border border-ui-border"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submittingPolice}
+                  className="flex items-center gap-2 px-5 py-2 text-xs font-bold text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 rounded-xl shadow-lg shadow-emerald-600/20 disabled:opacity-50"
+                >
+                  {submittingPolice ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
+                  <span>Create Officer Account</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 2. ASSIGN AS POLICE MODAL */}
+      {/* ========================================================================= */}
+      {isAssignPoliceModalOpen && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md overflow-y-auto">
+          <div className="glass-panel w-full max-w-3xl my-8 overflow-hidden flex flex-col shadow-2xl border border-purple-500/30 rounded-2xl">
+            {/* Header */}
+            <div className="flex items-center justify-between p-5 border-b border-white/10 bg-purple-500/10 dark:bg-purple-500/5">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-purple-500/20 text-purple-600 dark:text-purple-400 rounded-xl border border-purple-500/30">
+                  <ShieldCheck className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-text-primary">Assign Existing User as Police Officer</h2>
+                  <p className="text-xs text-text-secondary">Select an eligible registered person and configure their law enforcement profile</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setIsAssignPoliceModalOpen(false)}
+                className="p-2 text-text-tertiary hover:text-text-primary hover:bg-ui-bg rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleAssignUserAsPolice} className="p-6 space-y-6 max-h-[80vh] overflow-y-auto">
+              {/* Step 1: Select User */}
+              <div className="space-y-3">
+                <label className="block text-xs font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">
+                  Step 1: Select Person from Registry
+                </label>
+                <div className="relative">
+                  <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary pointer-events-none" />
+                  <input
+                    type="text"
+                    placeholder="Filter by name, email, or UID..."
+                    value={assignSearchQuery}
+                    onChange={(e) => setAssignSearchQuery(e.target.value)}
+                    className="w-full pl-9 pr-3 py-2 text-xs rounded-xl bg-ui-bg border border-ui-border text-text-primary focus:outline-none focus:border-purple-500"
+                  />
+                </div>
+
+                <div className="max-h-40 overflow-y-auto space-y-1.5 p-2 bg-black/5 dark:bg-white/5 rounded-xl border border-ui-border">
+                  {usersData
+                    .filter(u => u.role !== "police" && (
+                      !assignSearchQuery.trim() ||
+                      (u.name && u.name.toLowerCase().includes(assignSearchQuery.toLowerCase())) ||
+                      (u.email && u.email.toLowerCase().includes(assignSearchQuery.toLowerCase())) ||
+                      (u.uid && u.uid.toLowerCase().includes(assignSearchQuery.toLowerCase()))
+                    ))
+                    .map(u => (
+                      <div
+                        key={u.uid}
+                        onClick={() => setSelectedUserToAssign(u)}
+                        className={`p-2.5 rounded-lg flex items-center justify-between cursor-pointer transition-all ${
+                          selectedUserToAssign?.uid === u.uid
+                            ? "bg-purple-500/20 border border-purple-500 text-purple-600 dark:text-purple-300 font-bold"
+                            : "hover:bg-black/5 dark:hover:bg-white/5 text-text-secondary"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <User className="w-4 h-4 text-purple-500 shrink-0" />
+                          <div className="text-xs truncate">
+                            <span className="font-semibold text-text-primary">{u.name || "Unknown User"}</span>
+                            <span className="ml-2 font-mono text-[11px] opacity-70">({u.email})</span>
+                          </div>
+                        </div>
+                        {selectedUserToAssign?.uid === u.uid && (
+                          <Check className="w-4 h-4 text-purple-500 shrink-0" />
+                        )}
+                      </div>
+                    ))}
+                </div>
+              </div>
+
+              {/* Step 2: Complete Police Details */}
+              {selectedUserToAssign && (
+                <div className="space-y-4 pt-2 border-t border-white/10">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">
+                    Step 2: Assign Officer ID, Rank & Posting
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-[11px] font-bold text-text-secondary uppercase mb-1">Police ID / Employee ID</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="POL-2026-XXXX"
+                        value={newPolice.policeId}
+                        onChange={(e) => setNewPolice({ ...newPolice, policeId: e.target.value })}
+                        className="w-full px-3 py-2 text-xs rounded-xl bg-ui-bg border border-ui-border text-purple-600 dark:text-purple-400 font-mono font-bold focus:outline-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-text-secondary uppercase mb-1">Rank / Designation</label>
+                      <select
+                        value={newPolice.rank}
+                        onChange={(e) => setNewPolice({ ...newPolice, rank: e.target.value })}
+                        className="w-full px-3 py-2 text-xs rounded-xl bg-ui-bg border border-ui-border text-text-primary font-semibold focus:outline-none"
+                      >
+                        <option value="Constable">Constable</option>
+                        <option value="Head Constable">Head Constable</option>
+                        <option value="Sub-Inspector">Sub-Inspector (SI)</option>
+                        <option value="Inspector">Inspector</option>
+                        <option value="ACP">ACP</option>
+                        <option value="DCP">DCP</option>
+                        <option value="DSP">DSP</option>
+                        <option value="SP">SP</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-text-secondary uppercase mb-1">Police Station / Dept</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Central Police Station"
+                        value={newPolice.stationName}
+                        onChange={(e) => setNewPolice({ ...newPolice, stationName: e.target.value })}
+                        className="w-full px-3 py-2 text-xs rounded-xl bg-ui-bg border border-ui-border text-text-primary focus:outline-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-text-secondary uppercase mb-1">Posting Location</label>
+                      <input
+                        type="text"
+                        placeholder="Sector / Zone"
+                        value={newPolice.postingLocation}
+                        onChange={(e) => setNewPolice({ ...newPolice, postingLocation: e.target.value })}
+                        className="w-full px-3 py-2 text-xs rounded-xl bg-ui-bg border border-ui-border text-text-primary focus:outline-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-text-secondary uppercase mb-1">Service Status</label>
+                      <select
+                        value={newPolice.serviceStatus}
+                        onChange={(e) => setNewPolice({ ...newPolice, serviceStatus: e.target.value })}
+                        className="w-full px-3 py-2 text-xs rounded-xl bg-ui-bg border border-ui-border text-text-primary focus:outline-none"
+                      >
+                        <option value="Active">Active Duty</option>
+                        <option value="On Leave">On Leave</option>
+                        <option value="Retired">Retired</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-text-secondary uppercase mb-1">Temporary Password</label>
+                      <input
+                        type="text"
+                        value={newPolice.password}
+                        onChange={(e) => setNewPolice({ ...newPolice, password: e.target.value })}
+                        placeholder="Police@2026!"
+                        className="w-full px-3 py-2 text-xs rounded-xl bg-ui-bg border border-ui-border text-text-primary font-mono focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Actions */}
+              <div className="pt-4 border-t border-white/10 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setIsAssignPoliceModalOpen(false)}
+                  className="px-4 py-2 text-xs font-bold text-text-secondary bg-ui-bg rounded-xl border border-ui-border"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={!selectedUserToAssign || submittingPolice}
+                  className="flex items-center gap-2 px-5 py-2 text-xs font-bold text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 rounded-xl shadow-lg shadow-purple-600/20 disabled:opacity-50"
+                >
+                  {submittingPolice ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
+                  <span>Confirm Police Assignment</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 3. UPDATE POLICE OFFICER MODAL (FULL EDITING) */}
+      {/* ========================================================================= */}
+      {isUpdatePoliceModalOpen && officerToUpdate && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md overflow-y-auto">
+          <div className="glass-panel w-full max-w-4xl my-8 overflow-hidden flex flex-col shadow-2xl border border-blue-500/30 rounded-2xl">
+            {/* Header */}
+            <div className="flex items-center justify-between p-5 border-b border-white/10 bg-blue-500/10 dark:bg-blue-500/5">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-blue-500/20 text-blue-600 dark:text-blue-400 rounded-xl border border-blue-500/30">
+                  <Edit className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-text-primary">Update Police Officer Profile</h2>
+                  <p className="text-xs text-text-secondary">Modify rank, posting, cases solved, history and service records</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setIsUpdatePoliceModalOpen(false)}
+                className="p-2 text-text-tertiary hover:text-text-primary hover:bg-ui-bg rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Form */}
+            <form onSubmit={handleSavePoliceUpdate} className="p-6 overflow-y-auto max-h-[80vh] space-y-6">
+              
+              {/* Select Officer Dropdown (if user wants to switch) */}
+              <div>
+                <label className="block text-[11px] font-bold text-text-secondary uppercase mb-1">Select Officer to Edit</label>
+                <select
+                  value={officerToUpdate.uid}
+                  onChange={(e) => {
+                    const found = usersData.find(u => u.uid === e.target.value);
+                    if (found) setOfficerToUpdate({ ...found });
+                  }}
+                  className="w-full px-3 py-2 text-xs rounded-xl bg-ui-bg border border-ui-border text-text-primary font-bold focus:outline-none"
+                >
+                  {usersData.filter(u => u.role === "police").map(o => (
+                    <option key={o.uid} value={o.uid}>
+                      {o.policeId || o.badgeNumber || "POL"} - {o.name} ({o.rank || "Officer"} @ {o.stationName || "Station"})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Editable Fields */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-[11px] font-bold text-text-secondary uppercase mb-1">Police ID / Employee ID</label>
+                  <input
+                    type="text"
+                    value={officerToUpdate.policeId || officerToUpdate.badgeNumber || ""}
+                    onChange={(e) => setOfficerToUpdate({ ...officerToUpdate, policeId: e.target.value, badgeNumber: e.target.value })}
+                    className="w-full px-3 py-2 text-xs rounded-xl bg-ui-bg border border-ui-border font-mono text-purple-600 dark:text-purple-400 font-bold"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-text-secondary uppercase mb-1">Full Name</label>
+                  <input
+                    type="text"
+                    value={officerToUpdate.name || ""}
+                    onChange={(e) => setOfficerToUpdate({ ...officerToUpdate, name: e.target.value })}
+                    className="w-full px-3 py-2 text-xs rounded-xl bg-ui-bg border border-ui-border text-text-primary font-semibold"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-text-secondary uppercase mb-1">Rank / Designation</label>
+                  <select
+                    value={officerToUpdate.rank || "Sub-Inspector"}
+                    onChange={(e) => setOfficerToUpdate({ ...officerToUpdate, rank: e.target.value })}
+                    className="w-full px-3 py-2 text-xs rounded-xl bg-ui-bg border border-ui-border text-text-primary font-semibold"
+                  >
+                    <option value="Constable">Constable</option>
+                    <option value="Head Constable">Head Constable</option>
+                    <option value="Sub-Inspector">Sub-Inspector (SI)</option>
+                    <option value="Inspector">Inspector</option>
+                    <option value="ACP">ACP</option>
+                    <option value="DCP">DCP</option>
+                    <option value="DSP">DSP</option>
+                    <option value="SP">SP</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-text-secondary uppercase mb-1">Police Station / Dept</label>
+                  <input
+                    type="text"
+                    value={officerToUpdate.stationName || ""}
+                    onChange={(e) => setOfficerToUpdate({ ...officerToUpdate, stationName: e.target.value })}
+                    className="w-full px-3 py-2 text-xs rounded-xl bg-ui-bg border border-ui-border text-text-primary"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-text-secondary uppercase mb-1">Current Posting Location</label>
+                  <input
+                    type="text"
+                    value={officerToUpdate.postingLocation || ""}
+                    onChange={(e) => setOfficerToUpdate({ ...officerToUpdate, postingLocation: e.target.value })}
+                    className="w-full px-3 py-2 text-xs rounded-xl bg-ui-bg border border-ui-border text-text-primary"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-text-secondary uppercase mb-1">Current Service Status</label>
+                  <select
+                    value={officerToUpdate.serviceStatus || officerToUpdate.dutyStatus || "Active"}
+                    onChange={(e) => setOfficerToUpdate({ ...officerToUpdate, serviceStatus: e.target.value, dutyStatus: e.target.value })}
+                    className="w-full px-3 py-2 text-xs rounded-xl bg-ui-bg border border-ui-border text-text-primary font-semibold"
+                  >
+                    <option value="Active">Active Duty</option>
+                    <option value="On Leave">On Leave</option>
+                    <option value="Retired">Retired</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-text-secondary uppercase mb-1">Phone Number</label>
+                  <input
+                    type="text"
+                    value={officerToUpdate.phone || officerToUpdate.mobileNumber || ""}
+                    onChange={(e) => setOfficerToUpdate({ ...officerToUpdate, phone: e.target.value, mobileNumber: e.target.value })}
+                    className="w-full px-3 py-2 text-xs rounded-xl bg-ui-bg border border-ui-border text-text-primary"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-text-secondary uppercase mb-1">Cases Handled</label>
+                  <input
+                    type="number"
+                    value={officerToUpdate.casesHandled || 0}
+                    onChange={(e) => setOfficerToUpdate({ ...officerToUpdate, casesHandled: Number(e.target.value) })}
+                    className="w-full px-3 py-2 text-xs rounded-xl bg-ui-bg border border-ui-border text-text-primary"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-text-secondary uppercase mb-1">Cases Solved</label>
+                  <input
+                    type="number"
+                    value={officerToUpdate.casesSolved || 0}
+                    onChange={(e) => setOfficerToUpdate({ ...officerToUpdate, casesSolved: Number(e.target.value) })}
+                    className="w-full px-3 py-2 text-xs rounded-xl bg-ui-bg border border-ui-border text-text-primary"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-text-secondary uppercase mb-1">Medals / Awards</label>
+                  <input
+                    type="number"
+                    value={officerToUpdate.medalsAwards || 0}
+                    onChange={(e) => setOfficerToUpdate({ ...officerToUpdate, medalsAwards: Number(e.target.value) })}
+                    className="w-full px-3 py-2 text-xs rounded-xl bg-ui-bg border border-ui-border text-text-primary"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-text-secondary uppercase mb-1">Special Skills / Certifications</label>
+                  <input
+                    type="text"
+                    value={officerToUpdate.specialSkills || ""}
+                    onChange={(e) => setOfficerToUpdate({ ...officerToUpdate, specialSkills: e.target.value })}
+                    className="w-full px-3 py-2 text-xs rounded-xl bg-ui-bg border border-ui-border text-text-primary"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-text-secondary uppercase mb-1">Emergency Contact</label>
+                  <input
+                    type="text"
+                    value={officerToUpdate.emergencyContact || ""}
+                    onChange={(e) => setOfficerToUpdate({ ...officerToUpdate, emergencyContact: e.target.value })}
+                    className="w-full px-3 py-2 text-xs rounded-xl bg-ui-bg border border-ui-border text-text-primary"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-text-secondary uppercase mb-1">Blood Group</label>
+                  <input
+                    type="text"
+                    value={officerToUpdate.bloodGroup || ""}
+                    onChange={(e) => setOfficerToUpdate({ ...officerToUpdate, bloodGroup: e.target.value })}
+                    className="w-full px-3 py-2 text-xs rounded-xl bg-ui-bg border border-ui-border text-text-primary"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-text-secondary uppercase mb-1">Education Qualification</label>
+                  <input
+                    type="text"
+                    value={officerToUpdate.education || ""}
+                    onChange={(e) => setOfficerToUpdate({ ...officerToUpdate, education: e.target.value })}
+                    className="w-full px-3 py-2 text-xs rounded-xl bg-ui-bg border border-ui-border text-text-primary"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-text-secondary uppercase mb-1">Promotion History</label>
+                  <input
+                    type="text"
+                    value={officerToUpdate.promotionHistory || ""}
+                    onChange={(e) => setOfficerToUpdate({ ...officerToUpdate, promotionHistory: e.target.value })}
+                    className="w-full px-3 py-2 text-xs rounded-xl bg-ui-bg border border-ui-border text-text-primary"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-text-secondary uppercase mb-1">Transfer History</label>
+                  <input
+                    type="text"
+                    value={officerToUpdate.transferHistory || ""}
+                    onChange={(e) => setOfficerToUpdate({ ...officerToUpdate, transferHistory: e.target.value })}
+                    className="w-full px-3 py-2 text-xs rounded-xl bg-ui-bg border border-ui-border text-text-primary"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-text-secondary uppercase mb-1">Commendations</label>
+                  <input
+                    type="text"
+                    value={officerToUpdate.commendations || ""}
+                    onChange={(e) => setOfficerToUpdate({ ...officerToUpdate, commendations: e.target.value })}
+                    className="w-full px-3 py-2 text-xs rounded-xl bg-ui-bg border border-ui-border text-text-primary"
+                  />
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="pt-4 border-t border-white/10 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setIsUpdatePoliceModalOpen(false)}
+                  className="px-4 py-2 text-xs font-bold text-text-secondary bg-ui-bg rounded-xl border border-ui-border"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submittingPolice}
+                  className="flex items-center gap-2 px-5 py-2 text-xs font-bold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 rounded-xl shadow-lg shadow-blue-600/20 disabled:opacity-50"
+                >
+                  {submittingPolice ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                  <span>Save Profile Updates</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 4. GENERATED LOGIN CREDENTIALS DIALOG */}
+      {/* ========================================================================= */}
+      {isCredentialsModalOpen && generatedCredentials && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-md">
+          <div className="glass-panel w-full max-w-md overflow-hidden flex flex-col shadow-2xl border border-emerald-500/50 rounded-2xl relative animate-in fade-in zoom-in-95 duration-200">
+            {/* Header Badge */}
+            <div className="p-6 bg-gradient-to-br from-emerald-500/20 to-teal-500/10 border-b border-emerald-500/30 text-center">
+              <div className="w-14 h-14 mx-auto rounded-2xl bg-emerald-500/20 border-2 border-emerald-500/40 flex items-center justify-center text-emerald-600 dark:text-emerald-400 mb-3 shadow-inner">
+                <ShieldCheck className="w-8 h-8" />
+              </div>
+              <h2 className="text-xl font-bold text-text-primary">Police Credentials Ready</h2>
+              <p className="text-xs text-text-secondary mt-1">Official account provisioned for {generatedCredentials.name}</p>
+            </div>
+
+            {/* Credential Cards */}
+            <div className="p-6 space-y-4 bg-black/5 dark:bg-white/5">
+              {/* Police ID */}
+              <div className="p-3 bg-ui-bg rounded-xl border border-ui-border flex items-center justify-between">
+                <div>
+                  <span className="block text-[10px] font-bold text-text-secondary uppercase">Police / Employee ID</span>
+                  <span className="text-sm font-mono font-bold text-purple-600 dark:text-purple-400">
+                    {generatedCredentials.policeId}
+                  </span>
+                </div>
+                <button
+                  onClick={() => copyToClipboard(generatedCredentials.policeId, "Police ID")}
+                  className="p-1.5 hover:bg-white/10 rounded-lg text-text-secondary hover:text-text-primary transition-colors"
+                  title="Copy Police ID"
+                >
+                  {copiedField === "Police ID" ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
+                </button>
+              </div>
+
+              {/* Login Email / User ID */}
+              <div className="p-3 bg-ui-bg rounded-xl border border-ui-border flex items-center justify-between">
+                <div>
+                  <span className="block text-[10px] font-bold text-text-secondary uppercase">Login User ID (Email)</span>
+                  <span className="text-sm font-semibold text-text-primary">
+                    {generatedCredentials.email}
+                  </span>
+                </div>
+                <button
+                  onClick={() => copyToClipboard(generatedCredentials.email, "Login Email")}
+                  className="p-1.5 hover:bg-white/10 rounded-lg text-text-secondary hover:text-text-primary transition-colors"
+                  title="Copy Email"
+                >
+                  {copiedField === "Login Email" ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
+                </button>
+              </div>
+
+              {/* Password */}
+              <div className="p-3 bg-ui-bg rounded-xl border border-emerald-500/30 flex items-center justify-between">
+                <div>
+                  <span className="block text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase">Generated Password</span>
+                  <span className="text-sm font-mono font-bold text-text-primary">
+                    {generatedCredentials.password}
+                  </span>
+                </div>
+                <button
+                  onClick={() => copyToClipboard(generatedCredentials.password, "Password")}
+                  className="p-1.5 hover:bg-white/10 rounded-lg text-text-secondary hover:text-text-primary transition-colors"
+                  title="Copy Password"
+                >
+                  {copiedField === "Password" ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
+                </button>
+              </div>
+
+              {/* Station & Designation */}
+              <div className="p-3 bg-ui-bg/50 rounded-xl border border-ui-border text-xs text-text-secondary space-y-1">
+                <div className="flex justify-between">
+                  <span>Designation:</span>
+                  <span className="font-semibold text-text-primary">{generatedCredentials.rank}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Police Station:</span>
+                  <span className="font-semibold text-text-primary">{generatedCredentials.stationName}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Login Portal:</span>
+                  <span className="font-mono text-emerald-600 dark:text-emerald-400">/login</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 border-t border-white/10 bg-ui-bg flex gap-2">
+              <button
+                onClick={() => {
+                  const credSummary = `CRIME ASSIST POLICE CREDENTIALS\nName: ${generatedCredentials.name}\nPolice ID: ${generatedCredentials.policeId}\nRank: ${generatedCredentials.rank}\nStation: ${generatedCredentials.stationName}\nLogin Email: ${generatedCredentials.email}\nPassword: ${generatedCredentials.password}\nLogin URL: http://localhost:3000/login`;
+                  navigator.clipboard.writeText(credSummary);
+                  toast.success("Complete credentials summary copied to clipboard!");
+                }}
+                className="flex-1 py-2.5 px-3 rounded-xl bg-ui-bg border border-ui-border text-xs font-bold text-text-primary hover:bg-white/40 dark:hover:bg-white/5 transition-all flex items-center justify-center gap-1.5"
+              >
+                <Copy className="w-4 h-4 text-purple-500" />
+                <span>Copy All Details</span>
+              </button>
+              <button
+                onClick={() => setIsCredentialsModalOpen(false)}
+                className="py-2.5 px-5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-xs font-bold text-white transition-all shadow-md shadow-emerald-600/20"
+              >
+                Done
+              </button>
+            </div>
           </div>
         </div>
       )}

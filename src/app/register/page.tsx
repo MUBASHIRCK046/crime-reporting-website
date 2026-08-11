@@ -113,34 +113,6 @@ export default function RegisterPage() {
               </div>
             </div>
 
-            {/* Role Selection */}
-            <div>
-              <label className="block text-sm font-medium text-text-secondary mb-2">I am a...</label>
-              <div className="grid grid-cols-2 gap-4">
-                <button
-                  type="button"
-                  onClick={() => setRole("citizen")}
-                  className={`py-3 px-4 rounded-xl border flex items-center justify-center gap-2 transition-all ${
-                    role === "citizen"
-                      ? "border-blue-500 bg-blue-500/10 text-blue-600 dark:text-blue-400 ring-1 ring-blue-500"
-                      : "glass-input text-text-secondary hover:border-ui-border"
-                  }`}
-                >
-                  <User className="h-4 w-4" /> Citizen
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setRole("police")}
-                  className={`py-3 px-4 rounded-xl border flex items-center justify-center gap-2 transition-all ${
-                    role === "police"
-                      ? "border-purple-500 bg-purple-500/10 text-purple-600 dark:text-purple-400 ring-1 ring-purple-500"
-                      : "glass-input text-text-secondary hover:border-ui-border"
-                  }`}
-                >
-                  <Shield className="h-4 w-4" /> Police Officer
-                </button>
-              </div>
-            </div>
           </div>
 
           <button
