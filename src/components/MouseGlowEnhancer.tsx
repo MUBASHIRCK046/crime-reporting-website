@@ -36,16 +36,16 @@ export function MouseGlowEnhancer() {
 
         // Check dark mode status
         const isDark = document.documentElement.classList.contains("dark");
-        
+
         // Dynamically assign variables for the liquid gradient
         if (isDark) {
-          interactiveEl.style.setProperty("--liquid-color-1", "rgba(139, 92, 246, 0.22)");
-          interactiveEl.style.setProperty("--liquid-color-2", "rgba(79, 140, 255, 0.18)");
+          interactiveEl.style.setProperty("--liquid-color-1", "rgba(80, 22, 214, 0.8)");
+          interactiveEl.style.setProperty("--liquid-color-2", "rgba(13, 98, 255, 1)");
           interactiveEl.style.setProperty("--mouse-glow-active-opacity", "0.45");
           interactiveEl.style.setProperty("--mouse-glow-opacity", "1");
         } else {
           // Subtle tint in light theme
-          interactiveEl.style.setProperty("--liquid-color-1", "rgba(79, 140, 255, 0.12)");
+          interactiveEl.style.setProperty("--liquid-color-1", "rgba(2, 91, 255, 1)");
           interactiveEl.style.setProperty("--liquid-color-2", "rgba(139, 92, 246, 0.10)");
           interactiveEl.style.setProperty("--mouse-glow-active-opacity", "0.3");
           interactiveEl.style.setProperty("--mouse-glow-opacity", "1");

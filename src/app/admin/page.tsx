@@ -33,8 +33,6 @@ export default function AdminDashboard() {
 
   // Credentials Generator States
   const [generatorSelectedOfficer, setGeneratorSelectedOfficer] = useState("");
-  const [generatorOfficerName, setGeneratorOfficerName] = useState("");
-  const [generatorBadgeNumber, setGeneratorBadgeNumber] = useState("");
   const [generatedPoliceId, setGeneratedPoliceId] = useState("");
   const [generatedPassword, setGeneratedPassword] = useState("");
   const [savingCredentials, setSavingCredentials] = useState(false);
@@ -284,16 +282,15 @@ export default function AdminDashboard() {
     setTimeout(() => setCopiedField(null), 2500);
   };
 
-  const handleGenerateCredentials = () => {
-    if (!generatorOfficerName.trim() || !generatorBadgeNumber.trim()) {
-      toast.error("Please enter both Officer Name and Badge Number.");
+  const handleGenerateCredentials = async () => {
+    if (!generatorSelectedOfficer) {
+      toast.error("Please select a registered officer first.");
       return;
     }
 
     // 1. Generate Police ID
     const selectedOfficerObj = usersData.find((o: any) => o.uid === generatorSelectedOfficer);
     const generatedId = selectedOfficerObj?.policeId || `POL-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
-    setGeneratedPoliceId(generatedId);
 
     // 2. Generate Password strictly matching: 1 upper, 2 lower, 1 special, 8 numbers (total 12)
     const uppers = "ABCDEFGHJKLMNPQRSTUVWXYZ";
@@ -312,39 +309,37 @@ export default function AdminDashboard() {
     }
 
     const pwd = `${u}${l1}${l2}${s}${n}`;
-    setGeneratedPassword(pwd);
-    toast.success("Credentials generated successfully!");
-  };
 
-  const handleSaveCredentials = async () => {
-    if (!generatorSelectedOfficer || !generatedPoliceId || !generatedPassword) return;
-
-    // Validate password structure: 1 upper, 2 lower, 1 special, 8 numbers (total 12)
-    const upperCount = (generatedPassword.match(/[A-Z]/g) || []).length;
-    const lowerCount = (generatedPassword.match(/[a-z]/g) || []).length;
-    const digitCount = (generatedPassword.match(/[0-9]/g) || []).length;
-    const specialCount = (generatedPassword.match(/[@#$%!*&]/g) || []).length;
-    const isValid = generatedPassword.length === 12 && upperCount === 1 && lowerCount === 2 && specialCount === 1 && digitCount === 8;
+    // Validate password format
+    const upperCount = (pwd.match(/[A-Z]/g) || []).length;
+    const lowerCount = (pwd.match(/[a-z]/g) || []).length;
+    const digitCount = (pwd.match(/[0-9]/g) || []).length;
+    const specialCount = (pwd.match(/[@#$%!*&]/g) || []).length;
+    const isValid = pwd.length === 12 && upperCount === 1 && lowerCount === 2 && specialCount === 1 && digitCount === 8;
 
     if (!isValid) {
-      toast.error("Password does not meet validation rules: must contain 1 uppercase, 2 lowercase, 1 special character, and 8 numbers (total 12 characters).");
+      toast.error("Generated password is invalid.");
       return;
     }
 
+    // 3. Immediately save to database
     setSavingCredentials(true);
     try {
+      const officerName = selectedOfficerObj.name || "";
+      const badgeNumber = selectedOfficerObj.badgeNumber || selectedOfficerObj.policeId || "";
+
       const adminUid = auth.currentUser?.uid || "admin";
-      const policeEmail = `${generatedPoliceId}@police.gov`;
+      const policeEmail = `${generatedId}@police.gov`;
       const response = await fetch("/api/admin/save-police-credentials", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           uid: generatorSelectedOfficer,
-          name: generatorOfficerName,
-          policeId: generatedPoliceId,
+          name: officerName,
+          policeId: generatedId,
           policeEmail: policeEmail,
-          badgeNumber: generatorBadgeNumber,
-          password: generatedPassword,
+          badgeNumber: badgeNumber,
+          password: pwd,
           adminUid
         })
       });
@@ -354,19 +349,14 @@ export default function AdminDashboard() {
         throw new Error(data.error || "Failed to save credentials.");
       }
 
+      setGeneratedPoliceId(generatedId);
+      setGeneratedPassword(pwd);
+
       if (data.alreadyGenerated) {
         toast.info("Credentials have already been generated for this officer.");
       } else {
         toast.success("Police credentials successfully created and saved.");
       }
-      
-      // Reset generator state
-      setGeneratorSelectedOfficer("");
-      setGeneratorOfficerName("");
-      setGeneratorBadgeNumber("");
-      setGeneratedPoliceId("");
-      setGeneratedPassword("");
-      setShowGeneratedPassword(false);
 
       // Refresh data
       fetchSystemData();
@@ -1138,8 +1128,6 @@ export default function AdminDashboard() {
                     if (uid) {
                       const officer = usersData.find(u => u.uid === uid);
                       if (officer) {
-                        setGeneratorOfficerName(officer.name || "");
-                        setGeneratorBadgeNumber(officer.badgeNumber || officer.policeId || "");
                         if (officer.credentialsGenerated || officer.policeId) {
                           setGeneratedPoliceId(officer.policeId);
                           setGeneratedPassword(officer.temporaryPassword || "********");
@@ -1149,8 +1137,6 @@ export default function AdminDashboard() {
                         }
                       }
                     } else {
-                      setGeneratorOfficerName("");
-                      setGeneratorBadgeNumber("");
                       setGeneratedPoliceId("");
                       setGeneratedPassword("");
                     }
@@ -1167,36 +1153,7 @@ export default function AdminDashboard() {
                 </select>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-text-secondary uppercase mb-2">Officer Name</label>
-                  <input
-                    type="text"
-                    value={generatorOfficerName}
-                    onChange={(e) => {
-                      setGeneratorOfficerName(e.target.value);
-                      setGeneratedPoliceId("");
-                      setGeneratedPassword("");
-                    }}
-                    placeholder="Enter full name"
-                    className="w-full px-3 py-2 text-xs rounded-xl bg-ui-bg border border-ui-border text-text-primary focus:outline-none focus:border-purple-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-text-secondary uppercase mb-2">Badge Number</label>
-                  <input
-                    type="text"
-                    value={generatorBadgeNumber}
-                    onChange={(e) => {
-                      setGeneratorBadgeNumber(e.target.value);
-                      setGeneratedPoliceId("");
-                      setGeneratedPassword("");
-                    }}
-                    placeholder="e.g. 4521"
-                    className="w-full px-3 py-2 text-xs rounded-xl bg-ui-bg border border-ui-border text-text-primary focus:outline-none focus:border-purple-500"
-                  />
-                </div>
-              </div>
+
 
               {(() => {
                 const selectedOfficerObj = usersData.find((o: any) => o.uid === generatorSelectedOfficer);
@@ -1210,11 +1167,12 @@ export default function AdminDashboard() {
                     )}
                     <button
                       type="button"
-                      disabled={credentialsAlreadyExist || !generatorOfficerName.trim() || !generatorBadgeNumber.trim()}
+                      disabled={credentialsAlreadyExist || savingCredentials || !generatorSelectedOfficer}
                       onClick={handleGenerateCredentials}
-                      className="px-4 py-2 bg-purple-600 hover:bg-purple-500 disabled:bg-purple-800/50 disabled:cursor-not-allowed text-white text-xs font-bold rounded-xl transition-all shadow-md active:scale-95"
+                      className="px-4 py-2 bg-purple-600 hover:bg-purple-500 disabled:bg-purple-800/50 disabled:cursor-not-allowed text-white text-xs font-bold rounded-xl transition-all shadow-md active:scale-95 flex items-center gap-1.5"
                     >
-                      Generate Credentials
+                      {savingCredentials ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+                      <span>Generate Credentials</span>
                     </button>
                   </div>
                 );
@@ -1272,29 +1230,13 @@ export default function AdminDashboard() {
                     </div>
                   </div>
 
-                  <div className="pt-2">
-                    <button
-                      type="button"
-                      disabled={generatorOfficerCredentialsExist || savingCredentials || !generatorSelectedOfficer}
-                      onClick={handleSaveCredentials}
-                      className="w-full py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:from-slate-800 disabled:to-slate-850 text-white text-xs font-bold rounded-xl shadow-md transition-all active:scale-95 flex items-center justify-center gap-2"
-                    >
-                      {savingCredentials ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                      <span>Save to Officer's Account</span>
-                    </button>
-                    {!generatorSelectedOfficer && (
-                      <p className="text-[10px] text-yellow-500/80 mt-1.5 text-center">
-                        * Please select a registered officer from the list to enable saving.
-                      </p>
-                    )}
-                  </div>
                 </div>
               ) : (
                 <div className="flex-1 flex flex-col items-center justify-center text-center p-6 text-text-tertiary">
                   <Sparkles className="w-8 h-8 mb-2 text-purple-500 opacity-50 animate-pulse" />
                   <p className="text-xs font-semibold text-text-primary">Credentials Sandbox</p>
                   <p className="text-[10px] text-text-secondary max-w-[200px] mt-1">
-                    Enter Name and Badge number, then click <strong>"Generate Credentials"</strong> to build the profile.
+                    Select a registered officer, then click <strong>"Generate Credentials"</strong> to provision their account credentials.
                   </p>
                 </div>
               )}
