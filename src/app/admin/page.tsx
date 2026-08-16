@@ -1634,66 +1634,69 @@ export default function AdminDashboard() {
           )}
 
           {activeTab === "Dashboard" ? (
-            <div className="flex flex-col gap-12 py-6">
-              {/* Morphing Stats Cards Section (Futuristic CSS Grid Layout) */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 my-6">
-                <MorphingCard
-                  title="Total Complaints"
-                  value={stats.totalComplaints}
-                  points={[1, 2.5, 1.2, 3]} // Complaint trends
-                  color="blue"
-                  type="line"
-                  delay={0.05}
-                />
-                
-                <MorphingCard
-                  title="Total FIRs"
-                  value={stats.totalFIRs}
-                  points={[1.2, 2.8, 1.8, 3.2, 2]} // FIR trends
-                  color="red"
-                  type="bar"
-                  delay={0.15}
-                />
-                
-                <MorphingCard
-                  title="Total CSRs"
-                  value={stats.totalCSRs}
-                  points={[1, 1.8, 1.2, 2.5]} // CSR trends
-                  color="purple"
-                  type="area"
-                  delay={0.25}
-                />
+            <div className="flex flex-col lg:flex-row gap-8 py-6 items-start">
+              {/* Left Column: Morphing Stats Grid */}
+              <div className="flex-1 w-full">
+                {/* Morphing Stats Cards Section (Futuristic CSS Grid Layout) */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 my-6">
+                  <MorphingCard
+                    title="Total Complaints"
+                    value={stats.totalComplaints}
+                    points={[1, 2.5, 1.2, 3]} // Complaint trends
+                    color="blue"
+                    type="line"
+                    delay={0.05}
+                  />
+                  
+                  <MorphingCard
+                    title="Total FIRs"
+                    value={stats.totalFIRs}
+                    points={[1.2, 2.8, 1.8, 3.2, 2]} // FIR trends
+                    color="red"
+                    type="bar"
+                    delay={0.15}
+                  />
+                  
+                  <MorphingCard
+                    title="Total CSRs"
+                    value={stats.totalCSRs}
+                    points={[1, 1.8, 1.2, 2.5]} // CSR trends
+                    color="purple"
+                    type="area"
+                    delay={0.25}
+                  />
 
-                <MorphingCard
-                  title="Total Users"
-                  value={citizenCount}
-                  points={[0.5, 1, 1.8, 3.2]} // Growth trends
-                  color="emerald"
-                  type="line"
-                  delay={0.35}
-                />
+                  <MorphingCard
+                    title="Total Users"
+                    value={citizenCount}
+                    points={[0.5, 1, 1.8, 3.2]} // Growth trends
+                    color="emerald"
+                    type="line"
+                    delay={0.35}
+                  />
 
-                <MorphingCard
-                  title="Total Police Officers"
-                  value={policeCount}
-                  points={[2, 1, 3, 1.5, 2.8]} // Activity trends
-                  color="indigo"
-                  type="area"
-                  delay={0.45}
-                />
+                  <MorphingCard
+                    title="Total Police Officers"
+                    value={policeCount}
+                    points={[2, 1, 3, 1.5, 2.8]} // Activity trends
+                    color="indigo"
+                    type="area"
+                    delay={0.45}
+                  />
 
-                <MorphingCard
-                  title="Total Administrators"
-                  value={adminCount}
-                  points={[1, 1.2, 1.5, 1.8, 2.2]} // Trend trends
-                  color="amber"
-                  type="line"
-                  delay={0.55}
-                />
+                  <MorphingCard
+                    title="Total Administrators"
+                    value={adminCount}
+                    points={[1, 1.2, 1.5, 1.8, 2.2]} // Trend trends
+                    color="amber"
+                    type="line"
+                    delay={0.55}
+                  />
+                </div>
               </div>
 
-              {/* Status Breakdown Section */}
-              <div className="flex items-center justify-center w-full mt-6">
+              {/* Right Column: Case Status Breakdown */}
+              <div className="w-full lg:w-[280px] xl:w-[320px] shrink-0 lg:mt-6">
                 <StatusDonutChart
                   pending={stats.pending}
                   inProgress={stats.inProgress}

@@ -374,39 +374,187 @@ export function StatusDonutChart({
   resolved: number; 
 }) {
   const total = pending + inProgress + resolved;
+  const radius = 40;
+  const strokeWidth = 8;
+  const circumference = 2 * Math.PI * radius; // ~251.32
+
+  // Angles and offsets
+  const pendingPct = total > 0 ? pending / total : 0;
+  const inProgressPct = total > 0 ? inProgress / total : 0;
+  const resolvedPct = total > 0 ? resolved / total : 0;
+
+  const pendingAngle = pendingPct * 360;
+  const inProgressAngle = inProgressPct * 360;
+  const resolvedAngle = resolvedPct * 360;
+
+  // Offsets (drawn end-to-end relative to the circumference)
+  const pendingOffset = circumference * (1 - pendingPct);
+  const inProgressOffset = circumference * (1 - inProgressPct);
+  const resolvedOffset = circumference * (1 - resolvedPct);
+
+  // Rotation start positions (Top of circle is -90deg)
+  const pendingStart = -90;
+  const inProgressStart = pendingStart + pendingAngle;
+  const resolvedStart = inProgressStart + inProgressAngle;
 
   return (
-    <div className="flex flex-col items-center justify-center p-8 glass-panel shadow-lg border border-white/20 dark:border-white/10 w-full max-w-4xl relative overflow-hidden backdrop-blur-xl bg-white/10 dark:bg-black/20">
+    <div className="flex flex-col items-center justify-center p-6 glass-panel shadow-lg border border-white/20 dark:border-white/10 w-full relative overflow-hidden backdrop-blur-xl bg-white/10 dark:bg-black/20 rounded-2xl">
       {/* Light refraction highlight */}
       <div className="absolute inset-0 bg-gradient-to-tr from-white/0 via-white/5 to-white/10 pointer-events-none"></div>
 
-      <h3 className="text-sm font-bold text-text-secondary uppercase tracking-wider mb-8 relative z-10 select-none">Case Status Breakdown</h3>
-      
-      {/* Horizontal Circle Row */}
-      <div className="flex flex-wrap items-center justify-center gap-8 md:gap-16 w-full relative z-10">
-        <StatusCircleCard
-          label="Pending"
-          value={pending}
-          total={total}
-          color="orange"
-          delay={0.1}
-        />
-        
-        <StatusCircleCard
-          label="In-Progress"
-          value={inProgress}
-          total={total}
-          color="blue"
-          delay={0.25}
-        />
-        
-        <StatusCircleCard
-          label="Resolved"
-          value={resolved}
-          total={total}
-          color="green"
-          delay={0.4}
-        />
+      <h3 className="text-xs font-bold text-text-secondary uppercase tracking-wider mb-6 relative z-10 select-none">
+        Case Status Breakdown
+      </h3>
+
+      {/* Donut Ring Layout */}
+      <div className="flex flex-col items-center justify-center gap-6 w-full relative z-10">
+        {/* SVG Donut Ring */}
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          whileHover={{ scale: 1.05 }}
+          transition={{ duration: 0.6, ease: "easeOut" }}
+          className="relative w-44 h-44 flex items-center justify-center cursor-pointer"
+        >
+          {/* Subtle Rotating Outer Glow Track */}
+          <motion.div
+            className="absolute inset-0 rounded-full border border-dashed border-white/10 opacity-30"
+            animate={{ rotate: 360 }}
+            transition={{ repeat: Infinity, duration: 25, ease: "linear" }}
+          />
+
+          <svg className="w-full h-full transform" viewBox="0 0 120 120">
+            {/* Empty Track */}
+            {total === 0 ? (
+              <circle
+                cx="60"
+                cy="60"
+                r={radius}
+                stroke="#475569"
+                strokeWidth={strokeWidth}
+                fill="transparent"
+                className="opacity-20"
+              />
+            ) : (
+              <>
+                {/* Pending Segment */}
+                {pending > 0 && (
+                  <motion.circle
+                    cx="60"
+                    cy="60"
+                    r={radius}
+                    stroke="#f59e0b"
+                    strokeWidth={strokeWidth}
+                    fill="transparent"
+                    strokeDasharray={circumference}
+                    initial={{ strokeDashoffset: circumference }}
+                    animate={{ strokeDashoffset: pendingOffset }}
+                    transition={{ duration: 0.8, ease: "easeInOut", delay: 0.1 }}
+                    transform={`rotate(${pendingStart} 60 60)`}
+                    strokeLinecap="round"
+                  />
+                )}
+
+                {/* In-Progress Segment */}
+                {inProgress > 0 && (
+                  <motion.circle
+                    cx="60"
+                    cy="60"
+                    r={radius}
+                    stroke="#06b6d4"
+                    strokeWidth={strokeWidth}
+                    fill="transparent"
+                    strokeDasharray={circumference}
+                    initial={{ strokeDashoffset: circumference }}
+                    animate={{ strokeDashoffset: inProgressOffset }}
+                    transition={{ duration: 0.8, ease: "easeInOut", delay: 0.2 }}
+                    transform={`rotate(${inProgressStart} 60 60)`}
+                    strokeLinecap="round"
+                  />
+                )}
+
+                {/* Resolved Segment */}
+                {resolved > 0 && (
+                  <motion.circle
+                    cx="60"
+                    cy="60"
+                    r={radius}
+                    stroke="#10b981"
+                    strokeWidth={strokeWidth}
+                    fill="transparent"
+                    strokeDasharray={circumference}
+                    initial={{ strokeDashoffset: circumference }}
+                    animate={{ strokeDashoffset: resolvedOffset }}
+                    transition={{ duration: 0.8, ease: "easeInOut", delay: 0.3 }}
+                    transform={`rotate(${resolvedStart} 60 60)`}
+                    strokeLinecap="round"
+                  />
+                )}
+              </>
+            )}
+          </svg>
+
+          {/* Center Hole Content */}
+          <div className="absolute text-center z-10 select-none flex flex-col items-center justify-center">
+            <span className="text-3xl font-black text-text-primary leading-none">
+              <CountUp to={total} />
+            </span>
+            <span className="text-[9px] uppercase font-black text-text-secondary tracking-wider mt-1">
+              Total Cases
+            </span>
+          </div>
+        </motion.div>
+
+        {/* Vertical Legend (each row stacked vertically) */}
+        <div className="w-full space-y-3 mt-2">
+          {/* Pending */}
+          <motion.div 
+            initial={{ opacity: 0, x: -10 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.4 }}
+            className="flex items-center justify-between p-2.5 bg-ui-bg/40 border border-amber-500/10 rounded-xl hover:border-amber-500/30 transition-all cursor-pointer"
+          >
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]" />
+              <span className="text-xs font-bold text-text-secondary">Pending</span>
+            </div>
+            <span className="text-sm font-black text-amber-500">
+              <CountUp to={pending} />
+            </span>
+          </motion.div>
+
+          {/* In-Progress */}
+          <motion.div 
+            initial={{ opacity: 0, x: -10 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.5 }}
+            className="flex items-center justify-between p-2.5 bg-ui-bg/40 border border-cyan-500/10 rounded-xl hover:border-cyan-500/30 transition-all cursor-pointer"
+          >
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-cyan-500 shadow-[0_0_8px_rgba(6,182,212,0.5)]" />
+              <span className="text-xs font-bold text-text-secondary">In-Progress</span>
+            </div>
+            <span className="text-sm font-black text-cyan-500">
+              <CountUp to={inProgress} />
+            </span>
+          </motion.div>
+
+          {/* Resolved */}
+          <motion.div 
+            initial={{ opacity: 0, x: -10 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.6 }}
+            className="flex items-center justify-between p-2.5 bg-ui-bg/40 border border-emerald-500/10 rounded-xl hover:border-emerald-500/30 transition-all cursor-pointer"
+          >
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
+              <span className="text-xs font-bold text-text-secondary">Resolved</span>
+            </div>
+            <span className="text-sm font-black text-emerald-500">
+              <CountUp to={resolved} />
+            </span>
+          </motion.div>
+        </div>
       </div>
     </div>
   );
