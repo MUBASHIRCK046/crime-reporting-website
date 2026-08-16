@@ -8,7 +8,7 @@
  */
 
 import { db } from "@/firebase/client";
-import { collection, getDocs, query, orderBy, doc, updateDoc, where, addDoc } from "firebase/firestore";
+import { collection, getDocs, getDoc, query, orderBy, doc, updateDoc, where, addDoc } from "firebase/firestore";
 import { CaseLog } from "./types";
 
 /**
@@ -53,6 +53,29 @@ export async function getAllComplaints() {
       });
     });
 
+    // Resolve citizen names using memory cache to prevent duplicate queries
+    const nameCache: Record<string, string> = {};
+    for (const c of complaints) {
+      const idToFetch = c.citizenId;
+      if (idToFetch) {
+        if (nameCache[idToFetch] !== undefined) {
+          c.citizenName = nameCache[idToFetch];
+        } else {
+          try {
+            const userDoc = await getDoc(doc(db, "users", idToFetch));
+            const name = userDoc.exists() ? (userDoc.data().name || "Name Not Available") : "Name Not Available";
+            nameCache[idToFetch] = name;
+            c.citizenName = name;
+          } catch (err) {
+            nameCache[idToFetch] = "Name Not Available";
+            c.citizenName = "Name Not Available";
+          }
+        }
+      } else {
+        c.citizenName = "Name Not Available";
+      }
+    }
+
     // Sort combined array
     complaints.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     
@@ -80,6 +103,28 @@ export async function getActiveSOSAlerts() {
       alerts.push({ id: doc.id, ...doc.data() });
     });
     
+    // Resolve citizen names using memory cache
+    const nameCache: Record<string, string> = {};
+    for (const a of alerts) {
+      if (a.citizenId) {
+        if (nameCache[a.citizenId] !== undefined) {
+          a.citizenName = nameCache[a.citizenId];
+        } else {
+          try {
+            const userDoc = await getDoc(doc(db, "users", a.citizenId));
+            const name = userDoc.exists() ? (userDoc.data().name || "Name Not Available") : "Name Not Available";
+            nameCache[a.citizenId] = name;
+            a.citizenName = name;
+          } catch (err) {
+            nameCache[a.citizenId] = "Name Not Available";
+            a.citizenName = "Name Not Available";
+          }
+        }
+      } else {
+        a.citizenName = "Name Not Available";
+      }
+    }
+
     // Sort client-side to avoid needing a Firestore composite index
     alerts.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
     
@@ -165,6 +210,29 @@ export async function getAssignedCases(officerId: string) {
           });
         }
       });
+    }
+
+    // Resolve citizen names using cache
+    const nameCache: Record<string, string> = {};
+    for (const c of complaints) {
+      const idToFetch = c.citizenId;
+      if (idToFetch) {
+        if (nameCache[idToFetch] !== undefined) {
+          c.citizenName = nameCache[idToFetch];
+        } else {
+          try {
+            const userDoc = await getDoc(doc(db, "users", idToFetch));
+            const name = userDoc.exists() ? (userDoc.data().name || "Name Not Available") : "Name Not Available";
+            nameCache[idToFetch] = name;
+            c.citizenName = name;
+          } catch (err) {
+            nameCache[idToFetch] = "Name Not Available";
+            c.citizenName = "Name Not Available";
+          }
+        }
+      } else {
+        c.citizenName = "Name Not Available";
+      }
     }
 
     complaints.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());

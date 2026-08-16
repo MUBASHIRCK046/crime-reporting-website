@@ -19,6 +19,7 @@ export async function exportCaseToPDF(complaint: any, caseLogs: CaseLog[]) {
   // Basic Info Table
   const basicInfo = [
     ['Complaint ID', complaint.id?.toUpperCase() || 'N/A'],
+    ['Citizen Name', complaint.citizenName || 'Name Not Available'],
     ['Title', complaint.title || 'N/A'],
     ['Status', complaint.status || 'N/A'],
     ['Filed Date', new Date(complaint.createdAt).toLocaleString()],
@@ -115,6 +116,7 @@ export function printCaseDetails(complaint: any, caseLogs: CaseLog[]) {
         
         <h2>General Information</h2>
         <div class="grid"><div class="label">Complaint ID:</div><div class="value">${complaint.id?.toUpperCase()}</div></div>
+        <div class="grid"><div class="label">Citizen Name:</div><div class="value">${complaint.citizenName || 'Name Not Available'}</div></div>
         <div class="grid"><div class="label">Title:</div><div class="value">${complaint.title}</div></div>
         <div class="grid"><div class="label">Status:</div><div class="value">${complaint.status}</div></div>
         <div class="grid"><div class="label">Filed Date:</div><div class="value">${new Date(complaint.createdAt).toLocaleString()}</div></div>

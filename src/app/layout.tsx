@@ -20,6 +20,7 @@ export const metadata: Metadata = {
 
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { MouseGlowEnhancer } from "@/components/MouseGlowEnhancer";
 
 export default function RootLayout({
   children,
@@ -54,6 +55,7 @@ export default function RootLayout({
           </div>
           <Toaster richColors position="top-right" theme="system" />
           <ThemeToggle />
+          <MouseGlowEnhancer />
         </ThemeProvider>
       </body>
     </html>

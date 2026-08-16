@@ -390,22 +390,90 @@ body {
   html {
     @apply font-sans;
   }
-  .maplibregl-popup-content {
-    @apply bg-transparent! shadow-none! p-0! rounded-none!;
+}
+
+/* Premium Interactive Liquid Animation Button styles */
+@media (prefers-reduced-motion: no-preference) {
+  button:not(:disabled),
+  a.glass-button,
+  a.glass-button-secondary,
+  [role="button"]:not([aria-disabled="true"]),
+  .clickable-card,
+  a.btn,
+  a.nav-link {
+    position: relative;
+    transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), 
+                box-shadow 0.4s cubic-bezier(0.16, 1, 0.3, 1), 
+                border-color 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+                background-color 0.4s cubic-bezier(0.16, 1, 0.3, 1);
   }
-  .maplibregl-popup-tip {
-    @apply hidden!;
+
+  /* Hover state: scale 1.02 and soft shadow glow */
+  button:not(:disabled):hover,
+  a.glass-button:hover,
+  a.glass-button-secondary:hover,
+  [role="button"]:not([aria-disabled="true"]):hover,
+  .clickable-card:hover,
+  a.btn:hover,
+  a.nav-link:hover {
+    transform: scale(1.02);
+    box-shadow: 0 10px 25px -5px rgba(139, 92, 246, 0.12), 
+                0 8px 16px -6px rgba(79, 140, 255, 0.1),
+                var(--tw-ring-offset-shadow, 0 0 #0000), 
+                var(--tw-ring-shadow, 0 0 #0000), 
+                var(--tw-shadow, 0 0 #0000);
   }
-  .maplibregl-ctrl-attrib {
-    @apply bg-background! text-muted-foreground! border-border! rounded-md! border! shadow-sm!;
+
+  /* Liquid dual-color gradient overlay beneath text */
+  button:not(:disabled)::before,
+  a.glass-button::before,
+  a.glass-button-secondary::before,
+  [role="button"]:not([aria-disabled="true"])::before,
+  .clickable-card::before,
+  a.btn::before,
+  a.nav-link::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    z-index: 1;
+    opacity: var(--mouse-glow-opacity, 0);
+    background: 
+      radial-gradient(
+        circle var(--mouse-glow-size, 75px) at var(--mouse-glow-x, 0px) var(--mouse-glow-y, 0px),
+        var(--liquid-color-1, rgba(139, 92, 246, 0.22)),
+        transparent 100%
+      ),
+      radial-gradient(
+        circle calc(var(--mouse-glow-size, 75px) * 1.4) at calc(var(--mouse-glow-x, 0px) + 25px) calc(var(--mouse-glow-y, 0px) - 20px),
+        var(--liquid-color-2, rgba(79, 140, 255, 0.18)),
+        transparent 100%
+      );
+    transition: opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1);
   }
-  .maplibregl-ctrl-attrib a {
-    @apply text-muted-foreground!;
+
+  /* Click feedback / scale down active state */
+  button:not(:disabled):active,
+  a.glass-button:active,
+  a.glass-button-secondary:active,
+  [role="button"]:not([aria-disabled="true"]):active,
+  .clickable-card:active,
+  a.btn:active,
+  a.nav-link:active {
+    transform: scale(0.98) !important;
+    transition: transform 0.1s cubic-bezier(0.16, 1, 0.3, 1) !important;
   }
-  .maplibregl-ctrl-attrib a:hover {
-    @apply text-foreground!;
-  }
-  .maplibregl-ctrl-attrib-button {
-    @apply bg-transparent! dark:invert;
+
+  button:not(:disabled):active::before,
+  a.glass-button:active::before,
+  a.glass-button-secondary:active::before,
+  [role="button"]:not([aria-disabled="true"]):active::before,
+  .clickable-card:active::before,
+  a.btn:active::before,
+  a.nav-link:active::before {
+    --mouse-glow-opacity: var(--mouse-glow-active-opacity, 0.45) !important;
+    --mouse-glow-size: 120px !important;
+    transition: opacity 0.1s ease !important;
   }
 }

@@ -5,8 +5,8 @@ import { useRouter } from "next/navigation";
 import { auth, db } from "@/firebase/client";
 import { doc, getDoc } from "firebase/firestore";
 import { getAssignedCases, getActiveSOSAlerts, updateComplaintStatus, addCaseLog, getCaseLogs } from "@/lib/police";
-import { logoutUser } from "@/lib/auth";
-import { Shield, LogOut, Loader2, Search, Filter, Eye, X, FileText, Send, Clock, User, Briefcase, Download, Printer, Save, Edit, Trash2, RotateCcw, Upload, Key, Power, MapPin, Calendar, Grid, Phone } from "lucide-react";
+import { logoutUser, changePolicePassword } from "@/lib/auth";
+import { Shield, LogOut, Loader2, Search, Filter, Eye, X, FileText, Send, Clock, User, Briefcase, Download, Printer, Save, Edit, Trash2, RotateCcw, Upload, Key, Power, MapPin, Calendar, Grid, Phone, Lock, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { CaseLog } from "@/lib/types";
 import { exportCaseToPDF, printCaseDetails } from "@/lib/export";
@@ -20,6 +20,13 @@ export default function PoliceDashboard() {
   const [sosAlerts, setSosAlerts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // Mandatory First-Login Password Change State
+  const [isChangePasswordModalOpen, setIsChangePasswordModalOpen] = useState(false);
+  const [newPasswordInput, setNewPasswordInput] = useState("");
+  const [confirmPasswordInput, setConfirmPasswordInput] = useState("");
+  const [changingPassword, setChangingPassword] = useState(false);
 
   // Modal State
   const [selectedComplaint, setSelectedComplaint] = useState<any | null>(null);
@@ -34,6 +41,11 @@ export default function PoliceDashboard() {
   const [isEditingPolice, setIsEditingPolice] = useState(false);
   const [fetchingProfile, setFetchingProfile] = useState(false);
 
+  // Citizen KYC Modal State
+  const [selectedCitizenProfile, setSelectedCitizenProfile] = useState<any | null>(null);
+  const [isKycModalOpen, setIsKycModalOpen] = useState(false);
+  const [fetchingKyc, setFetchingKyc] = useState(false);
+
   useEffect(() => {
     const checkAuthAndFetchData = async () => {
       auth.onAuthStateChanged(async (user) => {
@@ -47,6 +59,10 @@ export default function PoliceDashboard() {
           const userData = userDoc.data();
           if (userData.role === "police") {
             setCurrentUser({ uid: user.uid, ...userData });
+            if (userData.mustChangePassword) {
+              router.push("/police/change-password");
+              return;
+            }
             fetchDashboardData(user.uid);
           } else if (userData.role === "admin") {
             router.push("/admin");
@@ -127,6 +143,14 @@ export default function PoliceDashboard() {
     router.push("/login");
   };
 
+  const handleShowKyc = async (citizenId: string) => {
+    setIsKycModalOpen(true);
+    setFetchingKyc(true);
+    const { profile } = await getUserProfile(citizenId);
+    setSelectedCitizenProfile(profile);
+    setFetchingKyc(false);
+  };
+
   if (loading || !currentUser) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center transition-colors duration-300">
@@ -140,6 +164,17 @@ export default function PoliceDashboard() {
   const investigating = complaints.filter(c => c.status === "Investigating" || c.status === "In-Progress").length;
   const resolved = complaints.filter(c => c.status === "Resolved" || c.status === "Closed").length;
   const highPriority = sosAlerts.length;
+
+  const filteredComplaints = complaints.filter(c => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return true;
+    const titleMatch = (c.title || "").toLowerCase().includes(query);
+    const idMatch = (c.id || "").toLowerCase().includes(query);
+    const typeMatch = (c.type || "").toLowerCase().includes(query);
+    const statusMatch = (c.status || "").toLowerCase().includes(query);
+    const citizenNameMatch = (c.citizenName || "").toLowerCase().includes(query);
+    return titleMatch || idMatch || typeMatch || statusMatch || citizenNameMatch;
+  });
 
   return (
     <div className="min-h-screen bg-background text-text-primary p-6 md:p-10 font-sans transition-colors duration-300">
@@ -211,6 +246,8 @@ export default function PoliceDashboard() {
                 <Search className="w-4 h-4 text-text-tertiary absolute left-3 top-1/2 -translate-y-1/2" />
                 <input 
                   type="text" 
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search CSR, Name, Title..." 
                   className="glass-input pl-9 pr-4 py-2 text-sm"
                 />
@@ -225,6 +262,7 @@ export default function PoliceDashboard() {
                   <tr className="bg-black/5 dark:bg-white/5 text-[10px] uppercase tracking-wider text-text-secondary border-b border-white/20">
                     <th className="px-6 py-4 font-semibold">ID</th>
                     <th className="px-6 py-4 font-semibold">COMPLAINT TITLE</th>
+                    <th className="px-6 py-4 font-semibold">CITIZEN</th>
                     <th className="px-6 py-4 font-semibold">TYPE</th>
                     <th className="px-6 py-4 font-semibold">STATUS</th>
                     <th className="px-6 py-4 font-semibold">DATE</th>
@@ -232,17 +270,18 @@ export default function PoliceDashboard() {
                   </tr>
                 </thead>
                 <tbody className="text-sm text-text-primary">
-                  {complaints.length === 0 ? (
+                  {filteredComplaints.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="px-6 py-8 text-center text-text-tertiary text-xs">
-                        No cases currently assigned to you.
+                      <td colSpan={7} className="px-6 py-8 text-center text-text-tertiary text-xs">
+                        No cases found.
                       </td>
                     </tr>
                   ) : (
-                    complaints.map((c) => (
+                    filteredComplaints.map((c) => (
                       <tr key={c.id} className="border-b border-white/10 hover:bg-white/40 dark:hover:bg-white/5 transition-colors">
                         <td className="px-6 py-4 font-mono text-xs text-text-tertiary">{c.id.substring(0, 8).toUpperCase()}</td>
                         <td className="px-6 py-4 font-medium text-text-primary max-w-[200px] truncate">{c.title}</td>
+                        <td className="px-6 py-4 text-xs font-semibold text-text-secondary">{c.citizenName || "Name Not Available"}</td>
                         <td className="px-6 py-4">
                           <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase border backdrop-blur-sm ${
                             (c.type === "FIR" || !c.type) ? "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20" :
@@ -360,7 +399,21 @@ export default function PoliceDashboard() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="bg-ui-bg backdrop-blur-sm p-4 rounded-xl border border-ui-border flex flex-col justify-between">
+                      <div>
+                        <span className="block text-[10px] uppercase font-bold text-text-secondary mb-1">Citizen Name</span>
+                        <p className="text-sm font-semibold text-text-primary">{selectedComplaint.citizenName || "Name Not Available"}</p>
+                      </div>
+                      {selectedComplaint.citizenId && (
+                        <button
+                          onClick={() => handleShowKyc(selectedComplaint.citizenId)}
+                          className="mt-2 text-xs text-blue-600 hover:text-blue-500 font-bold flex items-center gap-1 self-start cursor-pointer"
+                        >
+                          <User className="w-3.5 h-3.5" /> Show KYC
+                        </button>
+                      )}
+                    </div>
                     <div className="bg-ui-bg backdrop-blur-sm p-4 rounded-xl border border-ui-border">
                       <span className="block text-[10px] uppercase font-bold text-text-secondary mb-1">Location</span>
                       <p className="text-sm font-medium text-text-primary">{selectedComplaint.location}</p>
@@ -678,6 +731,197 @@ export default function PoliceDashboard() {
                 
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MANDATORY FIRST-LOGIN CHANGE PASSWORD MODAL */}
+      {/* ========================================================================= */}
+      {isChangePasswordModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-lg">
+          <div className="glass-panel w-full max-w-md overflow-hidden shadow-2xl border border-purple-500/40 rounded-2xl relative animate-in fade-in zoom-in-95 duration-200">
+            <div className="p-6 bg-gradient-to-br from-purple-500/20 to-indigo-500/10 border-b border-purple-500/30 text-center">
+              <div className="w-14 h-14 mx-auto rounded-2xl bg-purple-500/20 border-2 border-purple-500/40 flex items-center justify-center text-purple-600 dark:text-purple-400 mb-3 shadow-inner">
+                <Lock className="w-8 h-8" />
+              </div>
+              <h2 className="text-xl font-bold text-text-primary">Change Temporary Password</h2>
+              <p className="text-xs text-text-secondary mt-1">
+                You are currently logged in with an administrator-assigned temporary password. Please set your permanent confidential password to continue.
+              </p>
+            </div>
+
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (newPasswordInput.length < 6) {
+                  toast.error("Password must be at least 6 characters long.");
+                  return;
+                }
+                if (newPasswordInput !== confirmPasswordInput) {
+                  toast.error("Passwords do not match.");
+                  return;
+                }
+
+                setChangingPassword(true);
+                const result = await changePolicePassword(newPasswordInput);
+                if (result.success) {
+                  toast.success("Password updated successfully! Welcome to your Police Portal.");
+                  setIsChangePasswordModalOpen(false);
+                  setCurrentUser((prev: any) => ({ ...prev, mustChangePassword: false }));
+                } else {
+                  toast.error(result.error || "Failed to update password.");
+                }
+                setChangingPassword(false);
+              }}
+              className="p-6 space-y-4"
+            >
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-text-secondary mb-1">
+                  New Permanent Password *
+                </label>
+                <input
+                  type="password"
+                  required
+                  placeholder="Enter new password (min 6 characters)"
+                  value={newPasswordInput}
+                  onChange={(e) => setNewPasswordInput(e.target.value)}
+                  className="w-full px-3.5 py-2.5 text-xs rounded-xl bg-ui-bg border border-ui-border text-text-primary focus:outline-none focus:border-purple-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-text-secondary mb-1">
+                  Confirm New Password *
+                </label>
+                <input
+                  type="password"
+                  required
+                  placeholder="Re-enter new password"
+                  value={confirmPasswordInput}
+                  onChange={(e) => setConfirmPasswordInput(e.target.value)}
+                  className="w-full px-3.5 py-2.5 text-xs rounded-xl bg-ui-bg border border-ui-border text-text-primary focus:outline-none focus:border-purple-500"
+                />
+              </div>
+
+              <div className="pt-2">
+                <button
+                  type="submit"
+                  disabled={changingPassword}
+                  className="w-full py-2.5 px-4 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-purple-600/25 flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {changingPassword ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                  <span>Save New Password & Enter Portal</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* CITIZEN KYC MODAL */}
+      {isKycModalOpen && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md transition-opacity animate-fade-in">
+          <div className="glass-panel w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl relative border border-emerald-500/20">
+            
+            {/* Header */}
+            <div className="flex items-center justify-between p-5 border-b border-white/20 bg-black/10 dark:bg-white/5 backdrop-blur-md">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-lg border border-emerald-500/20">
+                  <User className="w-5 h-5" />
+                </div>
+                <h2 className="text-lg font-bold text-text-primary uppercase tracking-widest drop-shadow-sm">
+                  Citizen KYC Verification
+                </h2>
+              </div>
+              <button 
+                onClick={() => {
+                  setIsKycModalOpen(false);
+                  setSelectedCitizenProfile(null);
+                }}
+                className="p-2 text-text-tertiary hover:text-text-primary hover:bg-ui-bg rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-6 overflow-y-auto flex-1 bg-white/5 dark:bg-black/5 space-y-6">
+              {fetchingKyc ? (
+                <div className="p-8 flex flex-col items-center justify-center h-64">
+                  <Loader2 className="w-8 h-8 animate-spin text-emerald-500 mb-2" />
+                  <p className="text-xs text-slate-500">Loading comprehensive citizen data...</p>
+                </div>
+              ) : selectedCitizenProfile ? (
+                <div className="space-y-6">
+                  
+                  {/* Photo & Basic Details */}
+                  <div className="flex flex-col sm:flex-row items-center gap-6 border-b border-white/10 pb-6">
+                    <div className="w-24 h-24 rounded-2xl bg-emerald-500/10 border-2 border-emerald-500/20 flex items-center justify-center overflow-hidden shrink-0 shadow-inner">
+                      {selectedCitizenProfile.photographUrl ? (
+                        <img src={selectedCitizenProfile.photographUrl} alt="Avatar" className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
+                          {selectedCitizenProfile.name?.charAt(0) || "C"}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex-1 text-center sm:text-left space-y-1">
+                      <h4 className="text-lg font-bold text-text-primary truncate">{selectedCitizenProfile.name || "Unknown Citizen"}</h4>
+                      <p className="text-xs text-text-secondary truncate">{selectedCitizenProfile.email}</p>
+                      <p className="text-xs font-mono text-emerald-600 dark:text-emerald-400">ID: {selectedCitizenProfile.id}</p>
+                    </div>
+                  </div>
+
+                  {/* Profile Fields Grid */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="bg-ui-bg backdrop-blur-sm p-3.5 rounded-xl border border-ui-border">
+                      <span className="block text-[10px] uppercase font-bold text-text-secondary mb-1">Mobile Number</span>
+                      <p className="text-sm font-medium text-text-primary">{selectedCitizenProfile.mobileNumber || "-"}</p>
+                    </div>
+                    <div className="bg-ui-bg backdrop-blur-sm p-3.5 rounded-xl border border-ui-border">
+                      <span className="block text-[10px] uppercase font-bold text-text-secondary mb-1">Date of Birth (DOB)</span>
+                      <p className="text-sm font-medium text-text-primary">{selectedCitizenProfile.dob || "-"}</p>
+                    </div>
+                    <div className="bg-ui-bg backdrop-blur-sm p-3.5 rounded-xl border border-ui-border">
+                      <span className="block text-[10px] uppercase font-bold text-text-secondary mb-1">Gender</span>
+                      <p className="text-sm font-medium text-text-primary">{selectedCitizenProfile.gender || "-"}</p>
+                    </div>
+                    <div className="bg-ui-bg backdrop-blur-sm p-3.5 rounded-xl border border-ui-border">
+                      <span className="block text-[10px] uppercase font-bold text-text-secondary mb-1">Occupation</span>
+                      <p className="text-sm font-medium text-text-primary">{selectedCitizenProfile.occupation || "-"}</p>
+                    </div>
+                  </div>
+
+                  {/* Addresses */}
+                  <div className="space-y-4">
+                    <div className="bg-ui-bg backdrop-blur-sm p-3.5 rounded-xl border border-ui-border">
+                      <span className="block text-[10px] uppercase font-bold text-text-secondary mb-1">Residential Address</span>
+                      <p className="text-xs text-text-primary leading-relaxed">{selectedCitizenProfile.residentialAddress || "Not Provided"}</p>
+                    </div>
+                    <div className="bg-ui-bg backdrop-blur-sm p-3.5 rounded-xl border border-ui-border">
+                      <span className="block text-[10px] uppercase font-bold text-text-secondary mb-1">Permanent Address</span>
+                      <p className="text-xs text-text-primary leading-relaxed">{selectedCitizenProfile.permanentAddress || "Not Provided"}</p>
+                    </div>
+                  </div>
+
+                  {/* ID Document Details */}
+                  <div className="bg-ui-bg backdrop-blur-sm p-3.5 rounded-xl border border-ui-border grid grid-cols-2 gap-4">
+                    <div>
+                      <span className="block text-[10px] uppercase font-bold text-text-secondary mb-1">ID Document Type</span>
+                      <p className="text-xs font-bold text-text-primary">{selectedCitizenProfile.idProofType || "N/A"}</p>
+                    </div>
+                    <div>
+                      <span className="block text-[10px] uppercase font-bold text-text-secondary mb-1">ID Document Number</span>
+                      <p className="text-xs font-mono text-text-secondary">{selectedCitizenProfile.idProofNumber || "-"}</p>
+                    </div>
+                  </div>
+
+                </div>
+              ) : (
+                <p className="text-center text-sm text-text-secondary">Citizen details could not be loaded.</p>
+              )}
+            </div>
+
           </div>
         </div>
       )}

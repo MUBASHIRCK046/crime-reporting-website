@@ -14,9 +14,11 @@ import { CaseLog } from "@/lib/types";
 import { 
   Shield, LayoutDashboard, Users, Grid, FileText, 
   FileSignature, FileKey, BarChart2, LogOut, Loader2,
-  AlertCircle, RefreshCw, CheckCircle2, Clock, MapPin, Eye, X, Image as ImageIcon, User, Phone, Droplet, HeartPulse, Map, Calendar, Briefcase, Globe, Fingerprint, Search, Download, Printer, Save, Edit, Trash2, RotateCcw, Upload, Key, Power, Send, UserPlus, UserCheck, ShieldCheck, Award, Star, GraduationCap, Building2, Copy, Check, Lock, Sparkles, FileSpreadsheet
+  AlertCircle, RefreshCw, CheckCircle2, Clock, MapPin, Eye, EyeOff, X, Image as ImageIcon, User, Phone, Droplet, HeartPulse, Map, Calendar, Briefcase, Globe, Fingerprint, Search, Download, Printer, Save, Edit, Trash2, RotateCcw, Upload, Key, Power, Send, UserPlus, UserCheck, ShieldCheck, Award, Star, GraduationCap, Building2, Copy, Check, Lock, Sparkles, FileSpreadsheet
 } from "lucide-react";
 import { exportCaseToPDF, printCaseDetails } from "@/lib/export";
+import { motion } from "framer-motion";
+import { MorphingCard, StatusDonutChart } from "@/components/MorphingStats";
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -29,12 +31,30 @@ export default function AdminDashboard() {
   const [userSearchQuery, setUserSearchQuery] = useState("");
   const [userRoleFilter, setUserRoleFilter] = useState("ALL");
 
+  // Credentials Generator States
+  const [generatorSelectedOfficer, setGeneratorSelectedOfficer] = useState("");
+  const [generatorOfficerName, setGeneratorOfficerName] = useState("");
+  const [generatorBadgeNumber, setGeneratorBadgeNumber] = useState("");
+  const [generatedPoliceId, setGeneratedPoliceId] = useState("");
+  const [generatedPassword, setGeneratedPassword] = useState("");
+  const [savingCredentials, setSavingCredentials] = useState(false);
+  const [showGeneratedPassword, setShowGeneratedPassword] = useState(false);
+
+  const selectedGeneratorOfficerObj = usersData.find((o: any) => o.uid === generatorSelectedOfficer);
+  const generatorOfficerCredentialsExist = selectedGeneratorOfficerObj ? (selectedGeneratorOfficerObj.credentialsGenerated || !!selectedGeneratorOfficerObj.policeId) : false;
+
   // Police Management States
   const [policeSearchQuery, setPoliceSearchQuery] = useState("");
   const [isAddPoliceModalOpen, setIsAddPoliceModalOpen] = useState(false);
   const [isAssignPoliceModalOpen, setIsAssignPoliceModalOpen] = useState(false);
   const [isUpdatePoliceModalOpen, setIsUpdatePoliceModalOpen] = useState(false);
   const [isCredentialsModalOpen, setIsCredentialsModalOpen] = useState(false);
+  const [isPoliceIdModalOpen, setIsPoliceIdModalOpen] = useState(false);
+  const [isResetConfirmModalOpen, setIsResetConfirmModalOpen] = useState(false);
+  const [isResetSuccessModalOpen, setIsResetSuccessModalOpen] = useState(false);
+  const [selectedOfficerForCredentials, setSelectedOfficerForCredentials] = useState<any | null>(null);
+  const [showPasswordInModal, setShowPasswordInModal] = useState(false);
+  const [resettingPasswordLoading, setResettingPasswordLoading] = useState(false);
   const [submittingPolice, setSubmittingPolice] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
@@ -42,15 +62,23 @@ export default function AdminDashboard() {
     name: string;
     userId: string;
     email: string;
-    password: string;
+    temporaryPassword: string;
     policeId: string;
+    badgeNumber: string;
     rank: string;
     stationName: string;
+  } | null>(null);
+
+  const [newResetCredentials, setNewResetCredentials] = useState<{
+    policeId: string;
+    newTemporaryPassword: string;
+    officerName: string;
   } | null>(null);
 
   // 23 Fields State for Add Police Officer
   const initialPoliceState = {
     policeId: "",
+    badgeNumber: "",
     name: "",
     dob: "",
     gender: "Male",
@@ -107,6 +135,10 @@ export default function AdminDashboard() {
     inProgress: 0,
     resolved: 0
   });
+
+  useEffect(() => {
+    document.title = "System Administrator";
+  }, []);
 
   useEffect(() => {
     const checkAuthAndFetchData = async () => {
@@ -252,25 +284,167 @@ export default function AdminDashboard() {
     setTimeout(() => setCopiedField(null), 2500);
   };
 
+  const handleGenerateCredentials = () => {
+    if (!generatorOfficerName.trim() || !generatorBadgeNumber.trim()) {
+      toast.error("Please enter both Officer Name and Badge Number.");
+      return;
+    }
+
+    // 1. Generate Police ID
+    const selectedOfficerObj = usersData.find((o: any) => o.uid === generatorSelectedOfficer);
+    const generatedId = selectedOfficerObj?.policeId || `POL-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+    setGeneratedPoliceId(generatedId);
+
+    // 2. Generate Password strictly matching: 1 upper, 2 lower, 1 special, 8 numbers (total 12)
+    const uppers = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+    const lowers = "abcdefghijkmnopqrstuvwxyz";
+    const specials = "@#$%!*&";
+    const digits = "0123456789";
+
+    const u = uppers[Math.floor(Math.random() * uppers.length)];
+    const l1 = lowers[Math.floor(Math.random() * lowers.length)];
+    const l2 = lowers[Math.floor(Math.random() * lowers.length)];
+    const s = specials[Math.floor(Math.random() * specials.length)];
+    
+    let n = "";
+    for (let i = 0; i < 8; i++) {
+      n += digits[Math.floor(Math.random() * digits.length)];
+    }
+
+    const pwd = `${u}${l1}${l2}${s}${n}`;
+    setGeneratedPassword(pwd);
+    toast.success("Credentials generated successfully!");
+  };
+
+  const handleSaveCredentials = async () => {
+    if (!generatorSelectedOfficer || !generatedPoliceId || !generatedPassword) return;
+
+    // Validate password structure: 1 upper, 2 lower, 1 special, 8 numbers (total 12)
+    const upperCount = (generatedPassword.match(/[A-Z]/g) || []).length;
+    const lowerCount = (generatedPassword.match(/[a-z]/g) || []).length;
+    const digitCount = (generatedPassword.match(/[0-9]/g) || []).length;
+    const specialCount = (generatedPassword.match(/[@#$%!*&]/g) || []).length;
+    const isValid = generatedPassword.length === 12 && upperCount === 1 && lowerCount === 2 && specialCount === 1 && digitCount === 8;
+
+    if (!isValid) {
+      toast.error("Password does not meet validation rules: must contain 1 uppercase, 2 lowercase, 1 special character, and 8 numbers (total 12 characters).");
+      return;
+    }
+
+    setSavingCredentials(true);
+    try {
+      const adminUid = auth.currentUser?.uid || "admin";
+      const policeEmail = `${generatedPoliceId}@police.gov`;
+      const response = await fetch("/api/admin/save-police-credentials", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          uid: generatorSelectedOfficer,
+          name: generatorOfficerName,
+          policeId: generatedPoliceId,
+          policeEmail: policeEmail,
+          badgeNumber: generatorBadgeNumber,
+          password: generatedPassword,
+          adminUid
+        })
+      });
+
+      const data = await response.json();
+      if (!response.ok || data.error) {
+        throw new Error(data.error || "Failed to save credentials.");
+      }
+
+      if (data.alreadyGenerated) {
+        toast.info("Credentials have already been generated for this officer.");
+      } else {
+        toast.success("Police credentials successfully created and saved.");
+      }
+      
+      // Reset generator state
+      setGeneratorSelectedOfficer("");
+      setGeneratorOfficerName("");
+      setGeneratorBadgeNumber("");
+      setGeneratedPoliceId("");
+      setGeneratedPassword("");
+      setShowGeneratedPassword(false);
+
+      // Refresh data
+      fetchSystemData();
+    } catch (err: any) {
+      console.error("Save credentials error:", err);
+      toast.error(err.message || "Failed to save credentials.");
+    } finally {
+      setSavingCredentials(false);
+    }
+  };
+
+  const calculateYearsOfService = (dojStr: string): string => {
+    if (!dojStr) return "0";
+    const dojDate = new Date(dojStr);
+    if (isNaN(dojDate.getTime())) return "0";
+    const today = new Date();
+    let years = today.getFullYear() - dojDate.getFullYear();
+    const monthDiff = today.getMonth() - dojDate.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dojDate.getDate())) {
+      years--;
+    }
+    return Math.max(0, years).toString();
+  };
+
   const handleCreatePoliceOfficer = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newPolice.name || !newPolice.email || !newPolice.password) {
-      toast.error("Please fill in the Officer's Name, Email, and Password.");
+
+    // Frontend Validations
+    if (!newPolice.name || !newPolice.email || !newPolice.badgeNumber || !newPolice.dob || !newPolice.doj) {
+      toast.error("Please fill in all required fields (Name, Email, Badge Number, DOB, and DOJ).");
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(newPolice.email)) {
+      toast.error("Please enter a valid email address.");
+      return;
+    }
+
+    const dobDate = new Date(newPolice.dob);
+    const dojDate = new Date(newPolice.doj);
+    if (isNaN(dobDate.getTime())) {
+      toast.error("Please enter a valid Date of Birth.");
+      return;
+    }
+    if (isNaN(dojDate.getTime())) {
+      toast.error("Please enter a valid Date of Joining.");
+      return;
+    }
+    if (dobDate >= dojDate) {
+      toast.error("Date of Birth must be before the Date of Joining.");
+      return;
+    }
+
+    const ageAtJoining = dojDate.getFullYear() - dobDate.getFullYear();
+    if (ageAtJoining < 18) {
+      toast.error("Officer must be at least 18 years old at the Date of Joining.");
+      return;
+    }
+
+    const handled = Number(newPolice.casesHandled) || 0;
+    const solved = Number(newPolice.casesSolved) || 0;
+    if (solved > handled) {
+      toast.error("Cases successfully solved cannot exceed cases handled.");
       return;
     }
 
     setSubmittingPolice(true);
-    const generatedPoliceId = newPolice.policeId.trim() || `POL-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
 
     try {
-      // 1. Call the server API route
+      // 1. Call the server API route to create officer and auto-generate credentials
       const adminUid = auth.currentUser?.uid || "admin";
       const response = await fetch("/api/admin/create-police", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...newPolice,
-          policeId: generatedPoliceId,
+          yearsOfService: calculateYearsOfService(newPolice.doj), // Ensure correct years of service is sent
           adminUid
         })
       });
@@ -278,42 +452,84 @@ export default function AdminDashboard() {
       const data = await response.json();
 
       if (!response.ok || data.error) {
-        // Fallback: If API returns error (e.g. Firebase Admin creds missing locally), write directly to Firestore
-        console.warn("API route warning, falling back to direct Firestore profile creation:", data.error);
-        const fallbackUid = "pol_" + Date.now().toString(36);
-        await setDoc(doc(db, "users", fallbackUid), {
-          ...newPolice,
-          uid: fallbackUid,
-          role: "police",
-          policeId: generatedPoliceId,
-          badgeNumber: generatedPoliceId,
-          isActive: true,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        });
+        throw new Error(data.error || "Failed to create police officer account.");
       }
 
-      // 2. Set credentials for the confirmation dialog
+      // 2. Set credentials returned by backend for the success popup
       setGeneratedCredentials({
-        name: newPolice.name,
+        name: data.officerName || newPolice.name,
         userId: newPolice.email,
         email: newPolice.email,
-        password: newPolice.password,
-        policeId: generatedPoliceId,
-        rank: newPolice.rank,
-        stationName: newPolice.stationName
+        temporaryPassword: data.temporaryPassword,
+        policeId: data.policeId,
+        badgeNumber: data.badgeNumber || newPolice.badgeNumber || "N/A",
+        rank: newPolice.rank || data.profile?.rank || "Sub-Inspector",
+        stationName: newPolice.stationName || data.profile?.stationName || "Central Police Station"
       });
+
+      // 3. Update local state directly with the new officer profile data returned by backend
+      if (data.profile) {
+        setUsersData((prevUsers: any[]) => [data.profile, ...prevUsers]);
+      }
 
       setIsAddPoliceModalOpen(false);
       setIsCredentialsModalOpen(true);
       setNewPolice(initialPoliceState);
-      toast.success("Police Officer account created successfully!");
+      toast.success("Police Officer created successfully!");
+      
+      // Sync in the background without blocking the UI loading spinner
       fetchSystemData();
     } catch (err: any) {
       console.error("Create police error:", err);
       toast.error(err.message || "Failed to create police officer.");
     } finally {
       setSubmittingPolice(false);
+    }
+  };
+
+  const handleResetPassword = async () => {
+    if (!selectedOfficerForCredentials) return;
+    setResettingPasswordLoading(true);
+
+    try {
+      const adminUid = auth.currentUser?.uid || "admin";
+      const response = await fetch("/api/admin/reset-police-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          uid: selectedOfficerForCredentials.uid,
+          adminUid
+        })
+      });
+
+      const data = await response.json();
+      if (!response.ok || data.error) {
+        throw new Error(data.error || "Failed to reset password.");
+      }
+
+      setNewResetCredentials({
+        policeId: data.policeId,
+        newTemporaryPassword: data.newTemporaryPassword,
+        officerName: data.officerName || selectedOfficerForCredentials.name
+      });
+
+      // Update local state and selected officer
+      setSelectedOfficerForCredentials((prev: any) => ({
+        ...prev,
+        temporaryPassword: data.newTemporaryPassword,
+        mustChangePassword: true
+      }));
+
+      setIsResetConfirmModalOpen(false);
+      setIsPoliceIdModalOpen(false);
+      setIsResetSuccessModalOpen(true);
+      fetchSystemData();
+      toast.success("Temporary password generated successfully!");
+    } catch (err: any) {
+      console.error("Reset password error:", err);
+      toast.error(err.message || "Failed to reset password.");
+    } finally {
+      setResettingPasswordLoading(false);
     }
   };
 
@@ -344,8 +560,9 @@ export default function AdminDashboard() {
           name: selectedUserToAssign.name || newPolice.name,
           userId: selectedUserToAssign.email || newPolice.email,
           email: selectedUserToAssign.email || newPolice.email,
-          password: tempPassword,
+          temporaryPassword: tempPassword,
           policeId: assignedPoliceId,
+          badgeNumber: newPolice.badgeNumber || assignedPoliceId || "N/A",
           rank: newPolice.rank,
           stationName: newPolice.stationName
         });
@@ -813,8 +1030,11 @@ export default function AdminDashboard() {
             {/* Button 1: Add Police Officer */}
             <button
               onClick={() => {
+                const defaultDoj = new Date().toISOString().split("T")[0];
                 setNewPolice({
                   ...initialPoliceState,
+                  doj: defaultDoj,
+                  yearsOfService: calculateYearsOfService(defaultDoj),
                   policeId: `POL-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
                   password: `Police@${Math.floor(1000 + Math.random() * 9000)}!`
                 });
@@ -826,23 +1046,7 @@ export default function AdminDashboard() {
               <span>Add Police Officer</span>
             </button>
 
-            {/* Button 2: Assign as Police */}
-            <button
-              onClick={() => {
-                setAssignSearchQuery("");
-                setSelectedUserToAssign(null);
-                setNewPolice({
-                  ...initialPoliceState,
-                  policeId: `POL-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
-                  password: `Police@${Math.floor(1000 + Math.random() * 9000)}!`
-                });
-                setIsAssignPoliceModalOpen(true);
-              }}
-              className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-bold rounded-xl shadow-md shadow-purple-600/20 transition-all active:scale-95"
-            >
-              <ShieldCheck className="w-4 h-4" />
-              <span>Assign as Police</span>
-            </button>
+
 
             {/* Button 3: Update Police Officer */}
             <button
@@ -915,6 +1119,189 @@ export default function AdminDashboard() {
           </div>
         </div>
 
+        {/* Generate Login Credentials Section */}
+        <div className="glass-panel p-6 rounded-2xl border border-ui-border bg-slate-950/20 shadow-md">
+          <h3 className="text-sm font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400 flex items-center gap-2 mb-4">
+            <Key className="w-4 h-4" /> Generate Login Credentials
+          </h3>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Left: Inputs */}
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-text-secondary uppercase mb-2">Select Officer</label>
+                <select
+                  value={generatorSelectedOfficer}
+                  onChange={(e) => {
+                    const uid = e.target.value;
+                    setGeneratorSelectedOfficer(uid);
+                    if (uid) {
+                      const officer = usersData.find(u => u.uid === uid);
+                      if (officer) {
+                        setGeneratorOfficerName(officer.name || "");
+                        setGeneratorBadgeNumber(officer.badgeNumber || officer.policeId || "");
+                        if (officer.credentialsGenerated || officer.policeId) {
+                          setGeneratedPoliceId(officer.policeId);
+                          setGeneratedPassword(officer.temporaryPassword || "********");
+                        } else {
+                          setGeneratedPoliceId("");
+                          setGeneratedPassword("");
+                        }
+                      }
+                    } else {
+                      setGeneratorOfficerName("");
+                      setGeneratorBadgeNumber("");
+                      setGeneratedPoliceId("");
+                      setGeneratedPassword("");
+                    }
+                    setShowGeneratedPassword(false);
+                  }}
+                  className="w-full px-3 py-2 text-xs rounded-xl bg-ui-bg border border-ui-border text-text-primary font-bold focus:outline-none focus:border-purple-500 [&>option]:bg-white dark:[&>option]:bg-slate-900"
+                >
+                  <option value="">-- Select Registered Officer --</option>
+                  {policeOfficers.map(officer => (
+                    <option key={officer.uid} value={officer.uid}>
+                      {officer.name} (Current ID: {officer.policeId || "None"})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-text-secondary uppercase mb-2">Officer Name</label>
+                  <input
+                    type="text"
+                    value={generatorOfficerName}
+                    onChange={(e) => {
+                      setGeneratorOfficerName(e.target.value);
+                      setGeneratedPoliceId("");
+                      setGeneratedPassword("");
+                    }}
+                    placeholder="Enter full name"
+                    className="w-full px-3 py-2 text-xs rounded-xl bg-ui-bg border border-ui-border text-text-primary focus:outline-none focus:border-purple-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-text-secondary uppercase mb-2">Badge Number</label>
+                  <input
+                    type="text"
+                    value={generatorBadgeNumber}
+                    onChange={(e) => {
+                      setGeneratorBadgeNumber(e.target.value);
+                      setGeneratedPoliceId("");
+                      setGeneratedPassword("");
+                    }}
+                    placeholder="e.g. 4521"
+                    className="w-full px-3 py-2 text-xs rounded-xl bg-ui-bg border border-ui-border text-text-primary focus:outline-none focus:border-purple-500"
+                  />
+                </div>
+              </div>
+
+              {(() => {
+                const selectedOfficerObj = usersData.find((o: any) => o.uid === generatorSelectedOfficer);
+                const credentialsAlreadyExist = selectedOfficerObj ? (selectedOfficerObj.credentialsGenerated || !!selectedOfficerObj.policeId) : false;
+                return (
+                  <div className="space-y-3 pt-2">
+                    {credentialsAlreadyExist && (
+                      <p className="text-xs text-yellow-500 font-semibold">
+                        ⚠️ Credentials have already been generated for this officer.
+                      </p>
+                    )}
+                    <button
+                      type="button"
+                      disabled={credentialsAlreadyExist || !generatorOfficerName.trim() || !generatorBadgeNumber.trim()}
+                      onClick={handleGenerateCredentials}
+                      className="px-4 py-2 bg-purple-600 hover:bg-purple-500 disabled:bg-purple-800/50 disabled:cursor-not-allowed text-white text-xs font-bold rounded-xl transition-all shadow-md active:scale-95"
+                    >
+                      Generate Credentials
+                    </button>
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* Right: Output */}
+            <div className="bg-slate-900/40 border border-ui-border rounded-xl p-4 flex flex-col justify-between">
+              {(generatedPoliceId || selectedGeneratorOfficerObj?.policeEmail) ? (
+                <div className="space-y-4">
+                  <div className="space-y-3">
+                    <div>
+                      <span className="block text-[10px] uppercase font-bold text-text-secondary mb-1">Generated Police Email</span>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          readOnly
+                          value={generatedPoliceId ? `${generatedPoliceId}@police.gov` : (selectedGeneratorOfficerObj?.policeEmail || "")}
+                          className="flex-1 px-3 py-1.5 text-xs font-mono font-bold rounded-lg bg-ui-bg border border-ui-border text-purple-600 dark:text-purple-400"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => copyToClipboard(generatedPoliceId ? `${generatedPoliceId}@police.gov` : (selectedGeneratorOfficerObj?.policeEmail || ""), "Police Email")}
+                          className="p-1.5 rounded-lg bg-ui-bg border border-ui-border hover:bg-white/10 text-xs font-bold transition-all text-text-secondary hover:text-text-primary shrink-0"
+                        >
+                          {copiedField === "Police Email" ? "Copied!" : "Copy"}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <span className="block text-[10px] uppercase font-bold text-text-secondary mb-1">Generated Password</span>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type={showGeneratedPassword ? "text" : "password"}
+                          readOnly
+                          value={generatedPassword || (selectedGeneratorOfficerObj?.temporaryPassword || "••••••••••••")}
+                          className="flex-1 px-3 py-1.5 text-xs font-mono font-bold rounded-lg bg-ui-bg border border-ui-border text-emerald-600 dark:text-emerald-400"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowGeneratedPassword(!showGeneratedPassword)}
+                          className="p-1.5 rounded-lg bg-ui-bg border border-ui-border hover:bg-white/10 text-text-secondary hover:text-text-primary shrink-0 cursor-pointer"
+                        >
+                          {showGeneratedPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => copyToClipboard(generatedPassword || (selectedGeneratorOfficerObj?.temporaryPassword || ""), "Password")}
+                          className="p-1.5 rounded-lg bg-ui-bg border border-ui-border hover:bg-white/10 text-xs font-bold transition-all text-text-secondary hover:text-text-primary shrink-0"
+                        >
+                          {copiedField === "Password" ? "Copied!" : "Copy"}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-2">
+                    <button
+                      type="button"
+                      disabled={generatorOfficerCredentialsExist || savingCredentials || !generatorSelectedOfficer}
+                      onClick={handleSaveCredentials}
+                      className="w-full py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:from-slate-800 disabled:to-slate-850 text-white text-xs font-bold rounded-xl shadow-md transition-all active:scale-95 flex items-center justify-center gap-2"
+                    >
+                      {savingCredentials ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                      <span>Save to Officer's Account</span>
+                    </button>
+                    {!generatorSelectedOfficer && (
+                      <p className="text-[10px] text-yellow-500/80 mt-1.5 text-center">
+                        * Please select a registered officer from the list to enable saving.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="flex-1 flex flex-col items-center justify-center text-center p-6 text-text-tertiary">
+                  <Sparkles className="w-8 h-8 mb-2 text-purple-500 opacity-50 animate-pulse" />
+                  <p className="text-xs font-semibold text-text-primary">Credentials Sandbox</p>
+                  <p className="text-[10px] text-text-secondary max-w-[200px] mt-1">
+                    Enter Name and Badge number, then click <strong>"Generate Credentials"</strong> to build the profile.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
         {/* POLICE OFFICERS TABLE */}
         <div className="glass-panel overflow-hidden shadow-sm border border-ui-border rounded-2xl">
           <div className="overflow-x-auto">
@@ -937,7 +1324,7 @@ export default function AdminDashboard() {
                     <td colSpan={8} className="px-6 py-12 text-center text-text-tertiary">
                       <Shield className="w-10 h-10 mx-auto mb-2 opacity-30 text-purple-500" />
                       <p className="font-semibold text-sm text-text-primary">No police officers found.</p>
-                      <p className="text-xs text-text-secondary mt-1">Use the "Add Police Officer" or "Assign as Police" buttons above to enroll officers.</p>
+                      <p className="text-xs text-text-secondary mt-1">Use the "Add Police Officer" button above to enroll officers.</p>
                     </td>
                   </tr>
                 ) : (
@@ -954,7 +1341,7 @@ export default function AdminDashboard() {
                       {/* Police ID */}
                       <td className="px-6 py-4">
                         <span className="font-mono text-xs font-bold text-purple-600 dark:text-purple-400 bg-purple-500/10 px-2.5 py-1 rounded-lg border border-purple-500/20">
-                          {officer.policeId || officer.badgeNumber || `POL-${officer.uid?.slice(-4) || "001"}`}
+                          {officer.policeId || "Not Generated"}
                         </span>
                       </td>
 
@@ -1020,7 +1407,21 @@ export default function AdminDashboard() {
 
                       {/* Actions */}
                       <td className="px-6 py-4 text-right whitespace-nowrap">
-                        <div className="inline-flex items-center gap-1.5">
+                        <div className="inline-flex items-center gap-2">
+                          {/* Police ID Credentials Button */}
+                          <button
+                            onClick={() => {
+                              setSelectedOfficerForCredentials({ ...officer });
+                              setShowPasswordInModal(false);
+                              setIsPoliceIdModalOpen(true);
+                            }}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-500/15 hover:bg-purple-500/25 text-purple-600 dark:text-purple-400 font-bold text-xs rounded-xl border border-purple-500/30 transition-all shadow-sm active:scale-95"
+                            title="View Officer Police ID & Credentials"
+                          >
+                            <Key className="w-3.5 h-3.5" />
+                            <span>Police ID</span>
+                          </button>
+
                           {/* View Profile */}
                           <button
                             onClick={async () => {
@@ -1042,30 +1443,10 @@ export default function AdminDashboard() {
                               setOfficerToUpdate({ ...officer });
                               setIsUpdatePoliceModalOpen(true);
                             }}
-                            className="p-1.5 bg-purple-500/10 hover:bg-purple-500/20 text-purple-600 dark:text-purple-400 rounded-lg border border-purple-500/20 transition-colors"
+                            className="p-1.5 bg-slate-500/10 hover:bg-slate-500/20 text-text-secondary hover:text-text-primary rounded-lg border border-ui-border transition-colors"
                             title="Update Officer"
                           >
                             <Edit className="w-3.5 h-3.5" />
-                          </button>
-
-                          {/* Credentials Dialog */}
-                          <button
-                            onClick={() => {
-                              setGeneratedCredentials({
-                                name: officer.name || "Police Officer",
-                                userId: officer.email || officer.uid,
-                                email: officer.email || "",
-                                password: "Use Admin-Assigned Password",
-                                policeId: officer.policeId || officer.badgeNumber || "POL-2026",
-                                rank: officer.rank || "Officer",
-                                stationName: officer.stationName || "Central Station"
-                              });
-                              setIsCredentialsModalOpen(true);
-                            }}
-                            className="p-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 rounded-lg border border-amber-500/20 transition-colors"
-                            title="View Login Credentials"
-                          >
-                            <Key className="w-3.5 h-3.5" />
                           </button>
                         </div>
                       </td>
@@ -1093,6 +1474,7 @@ export default function AdminDashboard() {
               <tr className="bg-black/5 dark:bg-white/5 text-[10px] uppercase tracking-wider text-text-secondary border-b border-white/20">
                 <th className="px-6 py-4 font-semibold">ID</th>
                 <th className="px-6 py-4 font-semibold">TITLE</th>
+                <th className="px-6 py-4 font-semibold">CITIZEN</th>
                 <th className="px-6 py-4 font-semibold">TYPE</th>
                 <th className="px-6 py-4 font-semibold">STATUS</th>
                 <th className="px-6 py-4 font-semibold">DATE</th>
@@ -1111,6 +1493,7 @@ export default function AdminDashboard() {
                   <tr key={c.id} className="border-b border-white/10 hover:bg-white/40 dark:hover:bg-white/5 transition-colors">
                     <td className="px-6 py-4 font-mono text-xs text-text-tertiary">{c.id.substring(0, 8).toUpperCase()}</td>
                     <td className="px-6 py-4 font-medium text-text-primary max-w-[250px] truncate">{c.title}</td>
+                    <td className="px-6 py-4 text-xs font-semibold text-text-secondary">{c.citizenName || "Name Not Available"}</td>
                     <td className="px-6 py-4">
                       <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase border backdrop-blur-sm ${
                         (c.type === "FIR" || !c.type) ? "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20" :
@@ -1171,15 +1554,24 @@ export default function AdminDashboard() {
     );
   }
 
+  const citizenCount = usersData.filter(u => u.role !== "police" && u.role !== "admin").length;
+  const policeCount = usersData.filter(u => u.role === "police").length;
+  const adminCount = usersData.filter(u => u.role === "admin").length;
+
   return (
-    <div className="min-h-screen bg-background text-text-primary flex transition-colors duration-300">
+    <motion.div 
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.6, ease: "easeInOut" }}
+      className="min-h-screen bg-background text-text-primary flex transition-colors duration-300"
+    >
       {/* SIDEBAR */}
       <aside className="w-[260px] glass-panel h-screen rounded-none flex flex-col fixed left-0 top-0 transition-colors duration-300 z-20 shadow-lg border-r border-white/20">
         <div className="p-6 border-b border-white/10 flex items-center gap-3 bg-black/5 dark:bg-white/5">
           <div className="w-8 h-8 rounded-full border-2 border-emerald-500/50 flex items-center justify-center bg-emerald-500/20 backdrop-blur-sm">
             <Shield className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
           </div>
-          <span className="font-bold tracking-wide text-text-primary drop-shadow-sm">System Admin</span>
+          <span className="font-bold tracking-wide text-text-primary drop-shadow-sm">System Administrator</span>
         </div>
         
         <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
@@ -1239,83 +1631,134 @@ export default function AdminDashboard() {
       </aside>
 
       {/* MAIN CONTENT */}
-      <main className="flex-1 ml-[260px] p-8 md:p-12 min-h-screen">
-        
-        <div className="max-w-6xl mx-auto">
-          <h1 className="text-2xl font-bold text-text-primary mb-6 drop-shadow-sm">
-            {activeTab === "Users" ? "Citizen & Users Management" : activeTab}
-          </h1>
+      <main className="flex-1 ml-[260px] p-8 md:p-12 min-h-screen relative overflow-hidden">
+        {/* Liquid Glass Background Blobs */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none z-0 opacity-30 dark:opacity-20">
+          <motion.div
+            animate={{
+              x: [0, 40, -20, 0],
+              y: [0, -30, 40, 0],
+              scale: [1, 1.15, 0.9, 1],
+            }}
+            transition={{
+              duration: 20,
+              repeat: Infinity,
+              ease: "easeInOut",
+            }}
+            className="absolute -top-40 -left-40 w-[500px] h-[500px] rounded-full bg-gradient-to-br from-cyan-400 to-blue-600 blur-[100px]"
+          />
+          <motion.div
+            animate={{
+              x: [0, -50, 30, 0],
+              y: [0, 50, -40, 0],
+              scale: [1, 0.9, 1.1, 1],
+            }}
+            transition={{
+              duration: 25,
+              repeat: Infinity,
+              ease: "easeInOut",
+            }}
+            className="absolute top-1/2 left-1/3 w-[450px] h-[450px] rounded-full bg-gradient-to-tr from-purple-500 to-indigo-600 blur-[110px]"
+          />
+          <motion.div
+            animate={{
+              x: [0, 20, -40, 0],
+              y: [0, -50, 20, 0],
+              scale: [1, 1.1, 0.95, 1],
+            }}
+            transition={{
+              duration: 18,
+              repeat: Infinity,
+              ease: "easeInOut",
+            }}
+            className="absolute -bottom-40 right-20 w-[600px] h-[600px] rounded-full bg-gradient-to-bl from-emerald-400 to-teal-500 blur-[120px]"
+          />
+        </div>
+
+        <div className="max-w-6xl mx-auto relative z-10">
+          {activeTab === "Dashboard" ? (
+            <motion.h1 
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.7, ease: "easeInOut" }}
+              className="text-3xl font-black tracking-tight text-text-primary mb-8 drop-shadow-sm text-center bg-gradient-to-r from-text-primary via-emerald-600 to-teal-600 bg-clip-text text-transparent"
+            >
+              System Administrator
+            </motion.h1>
+          ) : (
+            <h1 className="text-2xl font-bold text-text-primary mb-6 drop-shadow-sm">
+              {activeTab === "Users" ? "Citizen & Users Management" : activeTab}
+            </h1>
+          )}
 
           {activeTab === "Dashboard" ? (
-            <>
-              {/* Type Metrics Row */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-                <div className="glass-panel p-6 flex flex-col justify-between h-40 shadow-sm">
-                  <div className="flex items-center gap-3 text-text-secondary">
-                    <div className="p-2 bg-blue-500/10 rounded-lg border border-blue-500/20 backdrop-blur-sm">
-                      <FileText className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                    </div>
-                    <span className="font-medium text-sm">Total Complaints</span>
-                  </div>
-                  <div className="text-4xl font-bold text-text-primary">{stats.totalComplaints}</div>
-                </div>
+            <div className="flex flex-col gap-12 py-6">
+              {/* Morphing Stats Cards Section (Futuristic CSS Grid Layout) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 my-6">
+                <MorphingCard
+                  title="Total Complaints"
+                  value={stats.totalComplaints}
+                  points={[1, 2.5, 1.2, 3]} // Complaint trends
+                  color="blue"
+                  type="line"
+                  delay={0.05}
+                />
+                
+                <MorphingCard
+                  title="Total FIRs"
+                  value={stats.totalFIRs}
+                  points={[1.2, 2.8, 1.8, 3.2, 2]} // FIR trends
+                  color="red"
+                  type="bar"
+                  delay={0.15}
+                />
+                
+                <MorphingCard
+                  title="Total CSRs"
+                  value={stats.totalCSRs}
+                  points={[1, 1.8, 1.2, 2.5]} // CSR trends
+                  color="purple"
+                  type="area"
+                  delay={0.25}
+                />
 
-                <div className="glass-panel p-6 flex flex-col justify-between h-40 shadow-sm">
-                  <div className="flex items-center gap-3 text-text-secondary">
-                    <div className="p-2 bg-red-500/10 rounded-lg border border-red-500/20 backdrop-blur-sm">
-                      <FileSignature className="w-5 h-5 text-red-600 dark:text-red-400" />
-                    </div>
-                    <span className="font-medium text-sm">Total FIRs</span>
-                  </div>
-                  <div className="text-4xl font-bold text-text-primary">{stats.totalFIRs}</div>
-                </div>
+                <MorphingCard
+                  title="Total Users"
+                  value={citizenCount}
+                  points={[0.5, 1, 1.8, 3.2]} // Growth trends
+                  color="emerald"
+                  type="line"
+                  delay={0.35}
+                />
 
-                <div className="glass-panel p-6 flex flex-col justify-between h-40 shadow-sm">
-                  <div className="flex items-center gap-3 text-text-secondary">
-                    <div className="p-2 bg-purple-500/10 rounded-lg border border-purple-500/20 backdrop-blur-sm">
-                      <FileKey className="w-5 h-5 text-purple-600 dark:text-purple-400" />
-                    </div>
-                    <span className="font-medium text-sm">Total CSRs</span>
-                  </div>
-                  <div className="text-4xl font-bold text-text-primary">{stats.totalCSRs}</div>
-                </div>
+                <MorphingCard
+                  title="Total Police Officers"
+                  value={policeCount}
+                  points={[2, 1, 3, 1.5, 2.8]} // Activity trends
+                  color="indigo"
+                  type="area"
+                  delay={0.45}
+                />
+
+                <MorphingCard
+                  title="Total Administrators"
+                  value={adminCount}
+                  points={[1, 1.2, 1.5, 1.8, 2.2]} // Trend trends
+                  color="amber"
+                  type="line"
+                  delay={0.55}
+                />
               </div>
 
-              <h2 className="text-xl font-bold text-text-primary mb-6 drop-shadow-sm">Status Breakdown</h2>
-
-              {/* Status Metrics Row */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="glass-panel p-6 flex flex-col justify-between h-40 shadow-sm">
-                  <div className="flex items-center gap-3 text-text-secondary">
-                    <div className="p-2 bg-yellow-500/10 rounded-lg border border-yellow-500/20 backdrop-blur-sm">
-                      <AlertCircle className="w-5 h-5 text-yellow-600 dark:text-yellow-400" />
-                    </div>
-                    <span className="font-medium text-sm">Pending</span>
-                  </div>
-                  <div className="text-4xl font-bold text-text-primary">{stats.pending}</div>
-                </div>
-
-                <div className="glass-panel p-6 flex flex-col justify-between h-40 shadow-sm">
-                  <div className="flex items-center gap-3 text-text-secondary">
-                    <div className="p-2 bg-indigo-500/10 rounded-lg border border-indigo-500/20 backdrop-blur-sm">
-                      <RefreshCw className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
-                    </div>
-                    <span className="font-medium text-sm">In-Progress</span>
-                  </div>
-                  <div className="text-4xl font-bold text-text-primary">{stats.inProgress}</div>
-                </div>
-
-                <div className="glass-panel p-6 flex flex-col justify-between h-40 shadow-sm">
-                  <div className="flex items-center gap-3 text-text-secondary">
-                    <div className="p-2 bg-emerald-500/10 rounded-lg border border-emerald-500/20 backdrop-blur-sm">
-                      <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-                    </div>
-                    <span className="font-medium text-sm">Resolved</span>
-                  </div>
-                  <div className="text-4xl font-bold text-text-primary">{stats.resolved}</div>
-                </div>
+              {/* Status Breakdown Section */}
+              <div className="flex items-center justify-center w-full mt-6">
+                <StatusDonutChart
+                  pending={stats.pending}
+                  inProgress={stats.inProgress}
+                  resolved={stats.resolved}
+                />
               </div>
-            </>
+            </div>
           ) : activeTab === "Police Officer Management" || activeTab === "Police Management" ? (
             renderPoliceManagementSection()
           ) : activeTab === "Users" || activeTab === "Citizen Management" ? (
@@ -1406,12 +1849,21 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
-                {/* Location */}
-                <div className="bg-ui-bg p-4 rounded-xl border border-ui-border backdrop-blur-sm">
-                  <span className="block text-[10px] uppercase font-bold text-text-secondary mb-2">Location</span>
-                  <div className="flex items-start gap-2 text-sm font-medium text-text-primary">
-                    <MapPin className="w-4 h-4 text-text-tertiary mt-0.5 shrink-0" />
-                    <span>{selectedComplaint.location}</span>
+                {/* Citizen & Location */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-ui-bg p-4 rounded-xl border border-ui-border backdrop-blur-sm">
+                    <span className="block text-[10px] uppercase font-bold text-text-secondary mb-2">Citizen Name</span>
+                    <div className="flex items-center gap-2 text-sm font-semibold text-text-primary">
+                      <User className="w-4 h-4 text-text-tertiary" />
+                      <span>{selectedComplaint.citizenName || "Name Not Available"}</span>
+                    </div>
+                  </div>
+                  <div className="bg-ui-bg p-4 rounded-xl border border-ui-border backdrop-blur-sm">
+                    <span className="block text-[10px] uppercase font-bold text-text-secondary mb-2">Location</span>
+                    <div className="flex items-start gap-2 text-sm font-medium text-text-primary">
+                      <MapPin className="w-4 h-4 text-text-tertiary mt-0.5 shrink-0" />
+                      <span>{selectedComplaint.location}</span>
+                    </div>
                   </div>
                 </div>
 
@@ -2061,26 +2513,14 @@ export default function AdminDashboard() {
             {/* Form */}
             <form onSubmit={handleCreatePoliceOfficer} className="p-6 overflow-y-auto max-h-[80vh] space-y-6">
               
-              {/* SECTION 1: IDENTITY & LOGIN CREDENTIALS */}
+              {/* SECTION 1: OFFICER BASIC INFORMATION */}
               <div className="space-y-4">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 flex items-center gap-2 border-b border-white/10 pb-2">
-                  <Lock className="w-4 h-4" /> 1. Identity & Generated Login Credentials
+                  <User className="w-4 h-4" /> 1. Officer Basic Information
                 </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                   <div>
-                    <label className="block text-[11px] font-bold text-text-secondary uppercase mb-1">1. Police ID / Employee ID</label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="e.g. POL-2026-1049"
-                      value={newPolice.policeId}
-                      onChange={(e) => setNewPolice({ ...newPolice, policeId: e.target.value })}
-                      className="w-full px-3 py-2 text-xs rounded-xl bg-ui-bg border border-ui-border font-mono text-purple-600 dark:text-purple-400 font-bold focus:outline-none focus:border-emerald-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-bold text-text-secondary uppercase mb-1">2. Full Name *</label>
+                    <label className="block text-[11px] font-bold text-text-secondary uppercase mb-1">Full Name *</label>
                     <input
                       type="text"
                       required
@@ -2092,7 +2532,19 @@ export default function AdminDashboard() {
                   </div>
 
                   <div>
-                    <label className="block text-[11px] font-bold text-text-secondary uppercase mb-1">6. Email Address (Login User ID) *</label>
+                    <label className="block text-[11px] font-bold text-text-secondary uppercase mb-1">Badge Number *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. 5119"
+                      value={newPolice.badgeNumber}
+                      onChange={(e) => setNewPolice({ ...newPolice, badgeNumber: e.target.value })}
+                      className="w-full px-3 py-2 text-xs rounded-xl bg-ui-bg border border-ui-border text-text-primary focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-text-secondary uppercase mb-1">Email Address *</label>
                     <input
                       type="email"
                       required
@@ -2104,19 +2556,7 @@ export default function AdminDashboard() {
                   </div>
 
                   <div>
-                    <label className="block text-[11px] font-bold text-text-secondary uppercase mb-1">Auto-Generated Password *</label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="e.g. Police@2026!"
-                      value={newPolice.password}
-                      onChange={(e) => setNewPolice({ ...newPolice, password: e.target.value })}
-                      className="w-full px-3 py-2 text-xs rounded-xl bg-ui-bg border border-ui-border text-text-primary font-mono focus:outline-none focus:border-emerald-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-bold text-text-secondary uppercase mb-1">5. Phone Number</label>
+                    <label className="block text-[11px] font-bold text-text-secondary uppercase mb-1">Phone Number</label>
                     <input
                       type="text"
                       placeholder="+91 9876543210"
@@ -2127,13 +2567,13 @@ export default function AdminDashboard() {
                   </div>
 
                   <div>
-                    <label className="block text-[11px] font-bold text-text-secondary uppercase mb-1">23. Current Service Status</label>
+                    <label className="block text-[11px] font-bold text-text-secondary uppercase mb-1">Current Service Status</label>
                     <select
                       value={newPolice.serviceStatus}
                       onChange={(e) => setNewPolice({ ...newPolice, serviceStatus: e.target.value })}
                       className="w-full px-3 py-2 text-xs rounded-xl bg-ui-bg border border-ui-border text-text-primary focus:outline-none focus:border-emerald-500"
                     >
-                      <option value="Active">Active Duty</option>
+                      <option value="Active">Active</option>
                       <option value="On Leave">On Leave</option>
                       <option value="Retired">Retired</option>
                     </select>
@@ -2194,19 +2634,22 @@ export default function AdminDashboard() {
                     <input
                       type="date"
                       value={newPolice.doj}
-                      onChange={(e) => setNewPolice({ ...newPolice, doj: e.target.value })}
+                      onChange={(e) => {
+                        const calculated = calculateYearsOfService(e.target.value);
+                        setNewPolice({ ...newPolice, doj: e.target.value, yearsOfService: calculated });
+                      }}
                       className="w-full px-3 py-2 text-xs rounded-xl bg-ui-bg border border-ui-border text-text-primary focus:outline-none focus:border-purple-500 [color-scheme:dark]"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-[11px] font-bold text-text-secondary uppercase mb-1">10. Years of Service</label>
+                    <label className="block text-[11px] font-bold text-text-secondary uppercase mb-1">10. Years of Service (Auto)</label>
                     <input
                       type="number"
                       min="0"
+                      disabled
                       value={newPolice.yearsOfService}
-                      onChange={(e) => setNewPolice({ ...newPolice, yearsOfService: e.target.value })}
-                      className="w-full px-3 py-2 text-xs rounded-xl bg-ui-bg border border-ui-border text-text-primary focus:outline-none focus:border-purple-500"
+                      className="w-full px-3 py-2 text-xs rounded-xl bg-ui-bg/50 border border-ui-border text-text-tertiary focus:outline-none cursor-not-allowed"
                     />
                   </div>
 
@@ -2394,7 +2837,7 @@ export default function AdminDashboard() {
                   className="flex items-center gap-2 px-5 py-2 text-xs font-bold text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 rounded-xl shadow-lg shadow-emerald-600/20 disabled:opacity-50"
                 >
                   {submittingPolice ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
-                  <span>Create Officer Account</span>
+                  <span>Create Police Officer</span>
                 </button>
               </div>
             </form>
@@ -2446,7 +2889,7 @@ export default function AdminDashboard() {
 
                 <div className="max-h-40 overflow-y-auto space-y-1.5 p-2 bg-black/5 dark:bg-white/5 rounded-xl border border-ui-border">
                   {usersData
-                    .filter(u => u.role !== "police" && (
+                    .filter(u => u.role === "police" && (
                       !assignSearchQuery.trim() ||
                       (u.name && u.name.toLowerCase().includes(assignSearchQuery.toLowerCase())) ||
                       (u.email && u.email.toLowerCase().includes(assignSearchQuery.toLowerCase())) ||
@@ -2843,106 +3286,103 @@ export default function AdminDashboard() {
       )}
 
       {/* ========================================================================= */}
-      {/* 4. GENERATED LOGIN CREDENTIALS DIALOG */}
+      {/* 4. SUCCESS POPUP: Police Officer Created Successfully ✓ */}
       {/* ========================================================================= */}
       {isCredentialsModalOpen && generatedCredentials && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-md">
           <div className="glass-panel w-full max-w-md overflow-hidden flex flex-col shadow-2xl border border-emerald-500/50 rounded-2xl relative animate-in fade-in zoom-in-95 duration-200">
-            {/* Header Badge */}
+            {/* Header */}
             <div className="p-6 bg-gradient-to-br from-emerald-500/20 to-teal-500/10 border-b border-emerald-500/30 text-center">
               <div className="w-14 h-14 mx-auto rounded-2xl bg-emerald-500/20 border-2 border-emerald-500/40 flex items-center justify-center text-emerald-600 dark:text-emerald-400 mb-3 shadow-inner">
-                <ShieldCheck className="w-8 h-8" />
+                <CheckCircle2 className="w-8 h-8" />
               </div>
-              <h2 className="text-xl font-bold text-text-primary">Police Credentials Ready</h2>
-              <p className="text-xs text-text-secondary mt-1">Official account provisioned for {generatedCredentials.name}</p>
+              <h2 className="text-xl font-bold text-text-primary">Police Officer Created Successfully ✓</h2>
+              <p className="text-xs text-text-secondary mt-1">Official police profile and login credentials provisioned.</p>
             </div>
 
-            {/* Credential Cards */}
+            {/* Details */}
             <div className="p-6 space-y-4 bg-black/5 dark:bg-white/5">
-              {/* Police ID */}
+              <div className="space-y-1">
+                <span className="text-[11px] font-bold text-text-secondary uppercase">Officer Name:</span>
+                <p className="text-sm font-bold text-text-primary">{generatedCredentials.name}</p>
+              </div>
+
+              <div className="space-y-1">
+                <span className="text-[11px] font-bold text-text-secondary uppercase">Badge Number:</span>
+                <p className="text-sm font-bold text-text-primary">{generatedCredentials.badgeNumber}</p>
+              </div>
+
               <div className="p-3 bg-ui-bg rounded-xl border border-ui-border flex items-center justify-between">
                 <div>
-                  <span className="block text-[10px] font-bold text-text-secondary uppercase">Police / Employee ID</span>
+                  <span className="block text-[10px] font-bold text-text-secondary uppercase">Police ID:</span>
                   <span className="text-sm font-mono font-bold text-purple-600 dark:text-purple-400">
                     {generatedCredentials.policeId}
                   </span>
                 </div>
                 <button
                   onClick={() => copyToClipboard(generatedCredentials.policeId, "Police ID")}
-                  className="p-1.5 hover:bg-white/10 rounded-lg text-text-secondary hover:text-text-primary transition-colors"
-                  title="Copy Police ID"
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-purple-500/10 text-purple-600 dark:text-purple-400 hover:bg-purple-500/20 border border-purple-500/20 transition-colors"
                 >
-                  {copiedField === "Police ID" ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
+                  {copiedField === "Police ID" ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                  <span>Copy</span>
                 </button>
               </div>
 
-              {/* Login Email / User ID */}
-              <div className="p-3 bg-ui-bg rounded-xl border border-ui-border flex items-center justify-between">
-                <div>
-                  <span className="block text-[10px] font-bold text-text-secondary uppercase">Login User ID (Email)</span>
-                  <span className="text-sm font-semibold text-text-primary">
-                    {generatedCredentials.email}
-                  </span>
-                </div>
-                <button
-                  onClick={() => copyToClipboard(generatedCredentials.email, "Login Email")}
-                  className="p-1.5 hover:bg-white/10 rounded-lg text-text-secondary hover:text-text-primary transition-colors"
-                  title="Copy Email"
-                >
-                  {copiedField === "Login Email" ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
-                </button>
-              </div>
-
-              {/* Password */}
               <div className="p-3 bg-ui-bg rounded-xl border border-emerald-500/30 flex items-center justify-between">
                 <div>
-                  <span className="block text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase">Generated Password</span>
+                  <span className="block text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase">Temporary Password:</span>
                   <span className="text-sm font-mono font-bold text-text-primary">
-                    {generatedCredentials.password}
+                    {generatedCredentials.temporaryPassword}
                   </span>
                 </div>
                 <button
-                  onClick={() => copyToClipboard(generatedCredentials.password, "Password")}
-                  className="p-1.5 hover:bg-white/10 rounded-lg text-text-secondary hover:text-text-primary transition-colors"
-                  title="Copy Password"
+                  onClick={() => copyToClipboard(generatedCredentials.temporaryPassword, "Password")}
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/20 transition-colors"
                 >
-                  {copiedField === "Password" ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
+                  {copiedField === "Password" ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                  <span>Copy</span>
                 </button>
               </div>
 
-              {/* Station & Designation */}
-              <div className="p-3 bg-ui-bg/50 rounded-xl border border-ui-border text-xs text-text-secondary space-y-1">
-                <div className="flex justify-between">
-                  <span>Designation:</span>
-                  <span className="font-semibold text-text-primary">{generatedCredentials.rank}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Police Station:</span>
-                  <span className="font-semibold text-text-primary">{generatedCredentials.stationName}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Login Portal:</span>
-                  <span className="font-mono text-emerald-600 dark:text-emerald-400">/login</span>
-                </div>
+              {/* Warning Note */}
+              <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-start gap-2.5">
+                <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                <p className="text-xs text-amber-800 dark:text-amber-200 font-medium leading-relaxed">
+                  This is a temporary password. The officer must reset the password after the first login.
+                </p>
               </div>
             </div>
 
-            {/* Footer */}
-            <div className="p-4 border-t border-white/10 bg-ui-bg flex gap-2">
+            {/* Buttons */}
+            <div className="p-4 border-t border-white/10 bg-ui-bg flex flex-wrap gap-2">
+              <button
+                onClick={() => copyToClipboard(generatedCredentials.policeId, "Police ID")}
+                className="flex-1 py-2 px-3 rounded-xl bg-ui-bg border border-ui-border text-xs font-bold text-text-primary hover:bg-white/40 dark:hover:bg-white/5 transition-all flex items-center justify-center gap-1.5"
+              >
+                <Copy className="w-3.5 h-3.5 text-purple-500" />
+                <span>Copy Police ID</span>
+              </button>
+              <button
+                onClick={() => copyToClipboard(generatedCredentials.temporaryPassword, "Password")}
+                className="flex-1 py-2 px-3 rounded-xl bg-ui-bg border border-ui-border text-xs font-bold text-text-primary hover:bg-white/40 dark:hover:bg-white/5 transition-all flex items-center justify-center gap-1.5"
+              >
+                <Copy className="w-3.5 h-3.5 text-emerald-500" />
+                <span>Copy Temporary Password</span>
+              </button>
               <button
                 onClick={() => {
-                  const credSummary = `CRIME ASSIST POLICE CREDENTIALS\nName: ${generatedCredentials.name}\nPolice ID: ${generatedCredentials.policeId}\nRank: ${generatedCredentials.rank}\nStation: ${generatedCredentials.stationName}\nLogin Email: ${generatedCredentials.email}\nPassword: ${generatedCredentials.password}\nLogin URL: http://localhost:3000/login`;
-                  navigator.clipboard.writeText(credSummary);
-                  toast.success("Complete credentials summary copied to clipboard!");
+                  const allText = `Police Officer Credentials\nOfficer: ${generatedCredentials.name}\nBadge Number: ${generatedCredentials.badgeNumber}\nPolice ID: ${generatedCredentials.policeId}\nEmail: ${generatedCredentials.email}\nTemporary Password: ${generatedCredentials.temporaryPassword}\nLogin Portal: http://localhost:3000/login`;
+                  navigator.clipboard.writeText(allText);
+                  toast.success("All credentials copied to clipboard!");
                 }}
-                className="flex-1 py-2.5 px-3 rounded-xl bg-ui-bg border border-ui-border text-xs font-bold text-text-primary hover:bg-white/40 dark:hover:bg-white/5 transition-all flex items-center justify-center gap-1.5"
+                className="w-full py-2 px-3 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 text-purple-600 dark:text-purple-300 border border-purple-500/30 text-xs font-bold transition-all flex items-center justify-center gap-1.5"
               >
-                <Copy className="w-4 h-4 text-purple-500" />
-                <span>Copy All Details</span>
+                <Copy className="w-3.5 h-3.5" />
+                <span>Copy Credentials</span>
               </button>
               <button
                 onClick={() => setIsCredentialsModalOpen(false)}
-                className="py-2.5 px-5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-xs font-bold text-white transition-all shadow-md shadow-emerald-600/20"
+                className="w-full py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-xs font-bold text-white transition-all shadow-md shadow-emerald-600/20"
               >
                 Done
               </button>
@@ -2951,6 +3391,270 @@ export default function AdminDashboard() {
         </div>
       )}
 
-    </div>
+      {/* ========================================================================= */}
+      {/* 5. POLICE ID POPUP: Police Officer Credentials */}
+      {/* ========================================================================= */}
+      {isPoliceIdModalOpen && selectedOfficerForCredentials && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-md">
+          <div className="glass-panel w-full max-w-md overflow-hidden flex flex-col shadow-2xl border border-purple-500/40 rounded-2xl relative animate-in fade-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="p-5 bg-gradient-to-br from-purple-500/20 to-indigo-500/10 border-b border-purple-500/30 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-purple-500/20 text-purple-600 dark:text-purple-400 rounded-xl border border-purple-500/30">
+                  <Key className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-text-primary">Police Officer Credentials</h2>
+                  <p className="text-xs text-text-secondary">Administrative credential management</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setIsPoliceIdModalOpen(false)}
+                className="p-1.5 text-text-tertiary hover:text-text-primary hover:bg-ui-bg rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 space-y-4 bg-black/5 dark:bg-white/5">
+              <div className="space-y-1">
+                <span className="text-[11px] font-bold text-text-secondary uppercase">Officer:</span>
+                <p className="text-sm font-bold text-text-primary">{selectedOfficerForCredentials.name || "Police Officer"}</p>
+                <p className="text-xs text-purple-600 dark:text-purple-400 font-medium">
+                  {selectedOfficerForCredentials.rank || "Officer"} • {selectedOfficerForCredentials.stationName || "Central Station"}
+                </p>
+              </div>
+
+              {/* Police ID */}
+              <div className="p-3 bg-ui-bg rounded-xl border border-ui-border flex items-center justify-between">
+                <div>
+                  <span className="block text-[10px] font-bold text-text-secondary uppercase">Police ID:</span>
+                  <span className="text-sm font-mono font-bold text-purple-600 dark:text-purple-400">
+                    {selectedOfficerForCredentials.policeId || "Not Generated"}
+                  </span>
+                </div>
+                <button
+                  onClick={() => copyToClipboard(selectedOfficerForCredentials.policeId || "Not Generated", "Police ID")}
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-purple-500/10 text-purple-600 dark:text-purple-400 hover:bg-purple-500/20 border border-purple-500/20 transition-colors"
+                >
+                  {copiedField === "Police ID" ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                  <span>Copy</span>
+                </button>
+              </div>
+
+              {/* Police Email */}
+              <div className="p-3 bg-ui-bg rounded-xl border border-ui-border flex items-center justify-between">
+                <div>
+                  <span className="block text-[10px] font-bold text-text-secondary uppercase">Police Email:</span>
+                  <span className="text-sm font-mono font-bold text-purple-600 dark:text-purple-400">
+                    {selectedOfficerForCredentials.policeEmail || (selectedOfficerForCredentials.policeId ? `${selectedOfficerForCredentials.policeId}@police.gov` : "Not Generated")}
+                  </span>
+                </div>
+                <button
+                  onClick={() => copyToClipboard(selectedOfficerForCredentials.policeEmail || (selectedOfficerForCredentials.policeId ? `${selectedOfficerForCredentials.policeId}@police.gov` : ""), "Police Email")}
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-purple-500/10 text-purple-600 dark:text-purple-400 hover:bg-purple-500/20 border border-purple-500/20 transition-colors"
+                >
+                  {copiedField === "Police Email" ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                  <span>Copy</span>
+                </button>
+              </div>
+
+              {/* Password Display */}
+              <div className="p-3 bg-ui-bg rounded-xl border border-ui-border space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="block text-[10px] font-bold text-text-secondary uppercase">Password:</span>
+                  <button
+                    onClick={() => setShowPasswordInModal(!showPasswordInModal)}
+                    className="text-xs font-bold text-purple-600 dark:text-purple-400 hover:underline flex items-center gap-1"
+                  >
+                    <Eye className="w-3.5 h-3.5" />
+                    <span>{showPasswordInModal ? "Hide Password" : "Show Password"}</span>
+                  </button>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-mono font-bold text-text-primary">
+                    {showPasswordInModal 
+                      ? (selectedOfficerForCredentials.temporaryPassword || "Temporary password set during creation/reset") 
+                      : "••••••••••••••"}
+                  </span>
+                  {showPasswordInModal && selectedOfficerForCredentials.temporaryPassword && (
+                    <button
+                      onClick={() => copyToClipboard(selectedOfficerForCredentials.temporaryPassword, "Password")}
+                      className="flex items-center gap-1 px-2 py-0.5 rounded text-xs font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20"
+                    >
+                      {copiedField === "Password" ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                <button
+                  onClick={() => copyToClipboard(selectedOfficerForCredentials.policeId || selectedOfficerForCredentials.badgeNumber || "POL-2026", "Police ID")}
+                  className="py-2 px-3 rounded-xl bg-ui-bg border border-ui-border text-xs font-bold text-text-primary hover:bg-white/40 dark:hover:bg-white/5 transition-all flex items-center justify-center gap-1.5"
+                >
+                  <Copy className="w-3.5 h-3.5 text-purple-500" />
+                  <span>Copy Police ID</span>
+                </button>
+                <button
+                  onClick={() => {
+                    if (selectedOfficerForCredentials.temporaryPassword) {
+                      copyToClipboard(selectedOfficerForCredentials.temporaryPassword, "Password");
+                    } else {
+                      toast.info("Password is only revealed when generated or reset.");
+                    }
+                  }}
+                  className="py-2 px-3 rounded-xl bg-ui-bg border border-ui-border text-xs font-bold text-text-primary hover:bg-white/40 dark:hover:bg-white/5 transition-all flex items-center justify-center gap-1.5"
+                >
+                  <Copy className="w-3.5 h-3.5 text-emerald-500" />
+                  <span>Copy Password</span>
+                </button>
+              </div>
+
+              <div className="border-t border-white/10 pt-3"></div>
+
+              {/* Reset Password Button */}
+              <button
+                onClick={() => setIsResetConfirmModalOpen(true)}
+                className="w-full py-2.5 px-4 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-600 dark:text-amber-400 border border-amber-500/30 text-xs font-bold transition-all flex items-center justify-center gap-2"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Reset Password</span>
+              </button>
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 border-t border-white/10 bg-ui-bg flex justify-end">
+              <button
+                onClick={() => setIsPoliceIdModalOpen(false)}
+                className="w-full py-2 px-4 rounded-xl bg-ui-bg border border-ui-border hover:bg-white/10 text-xs font-bold text-text-secondary transition-all"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 6. RESET PASSWORD CONFIRMATION MODAL */}
+      {/* ========================================================================= */}
+      {isResetConfirmModalOpen && selectedOfficerForCredentials && (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center p-4 bg-slate-900/75 backdrop-blur-md">
+          <div className="glass-panel w-full max-w-sm overflow-hidden flex flex-col shadow-2xl border border-amber-500/40 rounded-2xl relative animate-in fade-in zoom-in-95 duration-200">
+            <div className="p-5 text-center">
+              <div className="w-12 h-12 mx-auto rounded-2xl bg-amber-500/20 border-2 border-amber-500/40 flex items-center justify-center text-amber-600 dark:text-amber-400 mb-3 shadow-inner">
+                <AlertCircle className="w-6 h-6" />
+              </div>
+              <h2 className="text-lg font-bold text-text-primary">Reset Password?</h2>
+              <p className="text-xs text-text-secondary mt-2 leading-relaxed">
+                Are you sure you want to reset the password for <span className="font-bold text-text-primary">{selectedOfficerForCredentials.name}</span>?
+              </p>
+              <p className="text-xs text-amber-600 dark:text-amber-400 font-semibold mt-1">
+                A new temporary password will be generated.
+              </p>
+            </div>
+
+            <div className="p-4 border-t border-white/10 bg-ui-bg flex gap-2">
+              <button
+                onClick={() => setIsResetConfirmModalOpen(false)}
+                className="flex-1 py-2 px-3 rounded-xl bg-ui-bg border border-ui-border text-xs font-bold text-text-secondary hover:text-text-primary transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleResetPassword}
+                disabled={resettingPasswordLoading}
+                className="flex-1 py-2 px-3 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-xs font-bold text-white transition-all shadow-md shadow-amber-600/20 flex items-center justify-center gap-1.5 disabled:opacity-50"
+              >
+                {resettingPasswordLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5" />}
+                <span>Reset Password</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 7. PASSWORD RESET SUCCESSFULLY MODAL */}
+      {/* ========================================================================= */}
+      {isResetSuccessModalOpen && newResetCredentials && (
+        <div className="fixed inset-0 z-[95] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-md">
+          <div className="glass-panel w-full max-w-md overflow-hidden flex flex-col shadow-2xl border border-emerald-500/50 rounded-2xl relative animate-in fade-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="p-6 bg-gradient-to-br from-emerald-500/20 to-teal-500/10 border-b border-emerald-500/30 text-center">
+              <div className="w-14 h-14 mx-auto rounded-2xl bg-emerald-500/20 border-2 border-emerald-500/40 flex items-center justify-center text-emerald-600 dark:text-emerald-400 mb-3 shadow-inner">
+                <CheckCircle2 className="w-8 h-8" />
+              </div>
+              <h2 className="text-xl font-bold text-text-primary">Password Reset Successfully ✓</h2>
+              <p className="text-xs text-text-secondary mt-1">A new temporary password has been provisioned for {newResetCredentials.officerName}</p>
+            </div>
+
+            {/* Details */}
+            <div className="p-6 space-y-4 bg-black/5 dark:bg-white/5">
+              <div className="p-3 bg-ui-bg rounded-xl border border-ui-border flex items-center justify-between">
+                <div>
+                  <span className="block text-[10px] font-bold text-text-secondary uppercase">Police ID:</span>
+                  <span className="text-sm font-mono font-bold text-purple-600 dark:text-purple-400">
+                    {newResetCredentials.policeId}
+                  </span>
+                </div>
+                <button
+                  onClick={() => copyToClipboard(newResetCredentials.policeId, "Police ID")}
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-purple-500/10 text-purple-600 dark:text-purple-400 hover:bg-purple-500/20 border border-purple-500/20 transition-colors"
+                >
+                  {copiedField === "Police ID" ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                  <span>Copy</span>
+                </button>
+              </div>
+
+              <div className="p-3 bg-ui-bg rounded-xl border border-emerald-500/30 flex items-center justify-between">
+                <div>
+                  <span className="block text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase">New Temporary Password:</span>
+                  <span className="text-sm font-mono font-bold text-text-primary">
+                    {newResetCredentials.newTemporaryPassword}
+                  </span>
+                </div>
+                <button
+                  onClick={() => copyToClipboard(newResetCredentials.newTemporaryPassword, "New Password")}
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/20 transition-colors"
+                >
+                  {copiedField === "New Password" ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                  <span>Copy</span>
+                </button>
+              </div>
+
+              {/* Warning Note */}
+              <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-start gap-2.5">
+                <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                <p className="text-xs text-amber-800 dark:text-amber-200 font-medium leading-relaxed">
+                  This is a temporary password. The officer must reset the password after first login.
+                </p>
+              </div>
+            </div>
+
+            {/* Buttons */}
+            <div className="p-4 border-t border-white/10 bg-ui-bg flex gap-2">
+              <button
+                onClick={() => copyToClipboard(newResetCredentials.newTemporaryPassword, "New Password")}
+                className="flex-1 py-2.5 px-4 rounded-xl bg-ui-bg border border-ui-border text-xs font-bold text-text-primary hover:bg-white/40 dark:hover:bg-white/5 transition-all flex items-center justify-center gap-1.5"
+              >
+                <Copy className="w-3.5 h-3.5 text-emerald-500" />
+                <span>Copy Password</span>
+              </button>
+              <button
+                onClick={() => setIsResetSuccessModalOpen(false)}
+                className="flex-1 py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-xs font-bold text-white transition-all shadow-md shadow-emerald-600/20"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+    </motion.div>
   );
 }

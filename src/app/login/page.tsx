@@ -4,115 +4,258 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { loginUser } from "@/lib/auth";
-import { Shield, Mail, Lock, AlertCircle, Loader2 } from "lucide-react";
+import { Shield, Mail, Lock, Loader2, Eye, EyeOff } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import Toast from "@/components/Toast";
 
 export default function LoginPage() {
   const router = useRouter();
   
-  const [email, setEmail] = useState("");
+  const [emailOrPoliceId, setEmailOrPoliceId] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "warning" } | null>(null);
   const [loading, setLoading] = useState(false);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setError("");
+    setToast(null);
 
-    const result = await loginUser(email, password);
+    const input = emailOrPoliceId.trim();
+
+    // 1. Email Format Validation (Only if it looks like an email)
+    if (input.includes("@")) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(input)) {
+        setToast({
+          message: "Please enter a valid email address, e.g. example@gmail.com.",
+          type: "warning"
+        });
+        setLoading(false);
+        return;
+      }
+    } else {
+      // It's a Police ID, ensure it is non-empty
+      if (!input) {
+        setToast({
+          message: "Please enter your Email Address or Police ID.",
+          type: "warning"
+        });
+        setLoading(false);
+        return;
+      }
+    }
+
+    const result = await loginUser(input, password);
 
     if (result.error) {
-      setError(result.error);
+      let userFriendlyError = "Incorrect email or password. Please try again.";
+      const errStr = result.error.toLowerCase();
+
+      // If it's a known Firebase Auth error or invalid credential error, map it
+      if (
+        errStr.includes("auth/invalid-credential") ||
+        errStr.includes("invalid-credential") ||
+        errStr.includes("auth/user-not-found") ||
+        errStr.includes("user-not-found") ||
+        errStr.includes("auth/wrong-password") ||
+        errStr.includes("wrong-password") ||
+        errStr.includes("auth/invalid-email") ||
+        errStr.includes("invalid-email")
+      ) {
+        userFriendlyError = "Incorrect email or password. Please try again.";
+      } else {
+        // Fallback for other errors (network, custom messages) but still mask raw technical codes
+        userFriendlyError = result.error.includes("auth/")
+          ? "Incorrect email or password. Please try again."
+          : result.error;
+      }
+
+      setToast({ message: userFriendlyError, type: "error" });
       setLoading(false);
     } else {
-      // Success! Route based on their role in Firestore
-      if (result.role === "admin") router.push("/admin");
-      else if (result.role === "police") router.push("/police");
-      else router.push("/citizen"); 
+      setToast({ message: "Success! Signing you in...", type: "success" });
+      
+      // Delay redirect slightly so user can view the success toast message
+      setTimeout(() => {
+        if (result.role === "admin") router.push("/admin");
+        else if (result.role === "police") router.push("/police");
+        else router.push("/citizen"); 
+      }, 1500);
     }
   };
 
+  // Outer container stagger
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.12,
+        delayChildren: 0.15,
+      },
+    },
+  };
+
+  // Inner form elements stagger
+  const formContainerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.06,
+        delayChildren: 0.25,
+      },
+    },
+  };
+
+  // Individual element fade + slide-up
+  const itemVariants = {
+    hidden: { opacity: 0, y: 12 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: {
+        duration: 0.45,
+        ease: [0.16, 1, 0.3, 1] as [number, number, number, number], // easeOutExpo
+      },
+    },
+  };
+
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden transition-colors duration-300">
-      
-      <div className="w-full max-w-md relative z-10">
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500/20 to-purple-500/20 mb-4 border border-ui-border glass-panel">
-            <Shield className="w-8 h-8 text-blue-600 dark:text-blue-400" />
+    <motion.div 
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.5 }}
+      className="min-h-screen flex items-center justify-center p-4 md:p-8 relative overflow-hidden transition-colors duration-300"
+    >
+      <motion.div 
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+        className="w-full max-w-4xl glass-panel p-6 md:p-10 lg:p-12 relative z-10 grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 items-center"
+      >
+        {/* Left Column: Branding and Header */}
+        <motion.div 
+          variants={itemVariants}
+          className="flex flex-col items-center justify-center text-center p-4 border-b md:border-b-0 md:border-r border-ui-border pb-8 md:pb-0 md:pr-8 lg:pr-12"
+        >
+          <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-blue-500/20 to-purple-500/20 mb-6 border border-ui-border glass-panel shadow-inner">
+            <Shield className="w-10 h-10 text-blue-600 dark:text-blue-400" />
           </div>
-          <h1 className="text-3xl font-bold text-text-primary tracking-tight drop-shadow-sm">Welcome Back</h1>
-          <p className="text-text-secondary mt-2">Sign in to your Crime Assist account</p>
-        </div>
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-sm font-bold tracking-widest text-blue-600 dark:text-blue-400 uppercase">Crime Assist Portal</span>
+          </div>
+          <h1 className="text-4xl md:text-5xl font-black text-text-primary tracking-tight drop-shadow-sm font-bold">Welcome Back</h1>
+          <p className="text-text-secondary mt-3 max-w-sm text-lg md:text-xl font-semibold">Sign in to your Crime Assist account</p>
+        </motion.div>
 
-        <form onSubmit={handleLogin} className="glass-panel p-8">
-          {/* Error Message Box */}
-          {error && (
-            <div className="mb-6 p-4 bg-red-500/10 border border-red-500/50 rounded-xl flex items-start gap-3 backdrop-blur-md">
-              <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
-              <p className="text-sm text-red-800 dark:text-red-200 font-medium">{error}</p>
-            </div>
-          )}
-
-          <div className="space-y-5">
-            {/* Email Input */}
-            <div>
-              <label className="block text-sm font-medium text-text-secondary mb-2">Email Address</label>
-              <div className="relative">
+        {/* Right Column: Form Container */}
+        <motion.div variants={itemVariants}>
+          <motion.form 
+            variants={formContainerVariants}
+            initial="hidden"
+            animate="visible"
+            onSubmit={handleLogin} 
+            className="flex flex-col space-y-5"
+          >
+            {/* Email / Police ID Input */}
+            <motion.div variants={itemVariants}>
+              <label className="block text-sm font-medium text-text-secondary mb-2">Email Address or Police ID</label>
+              <motion.div 
+                whileHover={{ scale: 1.005 }}
+                transition={{ duration: 0.2 }}
+                className="relative"
+              >
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none z-10">
                   <Mail className="h-5 w-5 text-text-tertiary" />
                 </div>
                 <input
-                  type="email"
+                  type="text"
                   required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  value={emailOrPoliceId}
+                  onChange={(e) => setEmailOrPoliceId(e.target.value)}
                   className="block w-full pl-10 pr-3 py-3 glass-input text-text-primary placeholder-text-tertiary"
-                  placeholder="you@example.com"
+                  placeholder="you@example.com or POL-2026-8569"
                 />
-              </div>
-            </div>
+              </motion.div>
+            </motion.div>
 
             {/* Password Input */}
-            <div>
+            <motion.div variants={itemVariants}>
               <label className="block text-sm font-medium text-text-secondary mb-2">Password</label>
-              <div className="relative">
+              <motion.div 
+                whileHover={{ scale: 1.005 }}
+                transition={{ duration: 0.2 }}
+                className="relative"
+              >
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none z-10">
                   <Lock className="h-5 w-5 text-text-tertiary" />
                 </div>
                 <input
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="block w-full pl-10 pr-3 py-3 glass-input text-text-primary placeholder-text-tertiary"
+                  className="block w-full pl-10 pr-10 py-3 glass-input text-text-primary placeholder-text-tertiary"
                   placeholder="••••••••"
                 />
-              </div>
-            </div>
-          </div>
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-text-tertiary hover:text-text-secondary focus:outline-none z-20 cursor-pointer"
+                >
+                  {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                </button>
+              </motion.div>
+            </motion.div>
 
-          <div className="mt-4 flex justify-end">
-            <Link href="#" className="text-sm text-blue-600 dark:text-blue-400 hover:text-purple-600 dark:hover:text-purple-400 transition-colors font-medium">
-              Forgot password?
-            </Link>
-          </div>
+            {/* Forgot Password Link */}
+            <motion.div variants={itemVariants} className="flex justify-end">
+              <Link href="#" className="text-xs text-blue-600 dark:text-blue-400 hover:text-purple-600 dark:hover:text-purple-400 transition-colors font-medium">
+                Forgot password?
+              </Link>
+            </motion.div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full mt-6 glass-button py-3 px-4 flex items-center justify-center gap-2 disabled:opacity-50"
-          >
-            {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Sign In"}
-          </button>
+            {/* Button */}
+            <motion.div variants={itemVariants}>
+              <motion.button
+                whileHover={!loading ? { scale: 1.015, translateY: -1 } : {}}
+                whileTap={!loading ? { scale: 0.985 } : {}}
+                transition={{ duration: 0.2 }}
+                type="submit"
+                disabled={loading}
+                className="w-full mt-4 glass-button py-3 px-4 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+              >
+                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Sign In"}
+              </motion.button>
+            </motion.div>
 
-          <p className="mt-6 text-center text-sm text-text-secondary">
-            Don't have an account?{" "}
-            <Link href="/register" className="text-blue-600 dark:text-blue-400 hover:text-purple-600 dark:hover:text-purple-400 font-medium transition-colors">
-              Register now
-            </Link>
-          </p>
-        </form>
-      </div>
-    </div>
+            {/* Link to Register */}
+            <motion.div variants={itemVariants}>
+              <p className="text-center text-sm text-text-secondary mt-2">
+                Don't have an account?{" "}
+                <Link href="/register" className="text-blue-600 dark:text-blue-400 hover:text-purple-600 dark:hover:text-purple-400 font-medium transition-colors">
+                  Register now
+                </Link>
+              </p>
+            </motion.div>
+
+          </motion.form>
+        </motion.div>
+      </motion.div>
+
+      {/* Reusable Toast Notification */}
+      <AnimatePresence>
+        {toast && (
+          <Toast
+            message={toast.message}
+            type={toast.type}
+            onClose={() => setToast(null)}
+          />
+        )}
+      </AnimatePresence>
+    </motion.div>
   );
 }
