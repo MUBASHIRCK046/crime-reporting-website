@@ -1,5 +1,5 @@
 import { db, storage } from "@/firebase/client";
-import { collection, addDoc, getDocs, query, where, doc, setDoc, getDoc, updateDoc } from "firebase/firestore";
+import { collection, addDoc } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { FIRIncident, FIROffence, FIREvidence, FIRWitness, FIRStatement, FIROfficerReview } from "./types";
 

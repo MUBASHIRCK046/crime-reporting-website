@@ -79,51 +79,65 @@
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
+  /* ── True black background ── */
+  --background: #0a0a0a;
+  --foreground: #ffffff;
 
-  --text-primary: #f8fafc;
-  --text-secondary: #cbd5e1;
-  --text-tertiary: #64748b;
+  --text-primary: #ffffff;
+  --text-secondary: #e5e5e5;
+  --text-tertiary: #a3a3a3;
 
-  --ui-bg: rgba(15, 23, 42, 0.5);
-  --ui-bg-hover: rgba(30, 41, 59, 0.7);
-  --ui-border: rgba(255, 255, 255, 0.1);
+  /* UI surfaces — pure dark, no blue tint */
+  --ui-bg: rgba(10, 10, 10, 0.6);
+  --ui-bg-hover: rgba(23, 23, 23, 0.8);
+  --ui-border: rgba(255, 255, 255, 0.08);
 
-  --glass-bg: rgba(24, 24, 27, 0.6);
-  --glass-bg-hover: rgba(39, 39, 42, 0.75);
-  --glass-border: rgba(255, 255, 255, 0.1);
-  --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
+  /* Glass panels */
+  --glass-bg: rgba(17, 17, 17, 0.7);
+  --glass-bg-hover: rgba(28, 28, 28, 0.85);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.6);
   --grid-color: rgba(255, 255, 255, 0.02);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+
+  /* Cards, popovers — dark gray, not blue */
+  --card: #111111;
+  --card-foreground: #ffffff;
+  --popover: #111111;
+  --popover-foreground: #ffffff;
+
+  /* Primary — light on dark */
+  --primary: #ffffff;
+  --primary-foreground: #0a0a0a;
+
+  /* Secondary & muted — dark grays */
+  --secondary: #1a1a1a;
+  --secondary-foreground: #e5e5e5;
+  --muted: #1a1a1a;
+  --muted-foreground: #a3a3a3;
+  --accent: #1a1a1a;
+  --accent-foreground: #e5e5e5;
+
+  --destructive: #ef4444;
+  --border: #262626;
+  --input: #1a1a1a;
+  --ring: #525252;
+
+  /* Charts */
+  --chart-1: #e5e5e5;
+  --chart-2: #a3a3a3;
+  --chart-3: #737373;
+  --chart-4: #525252;
+  --chart-5: #404040;
+
+  /* Sidebar */
+  --sidebar: #0a0a0a;
+  --sidebar-foreground: #e5e5e5;
+  --sidebar-primary: #ffffff;
+  --sidebar-primary-foreground: #0a0a0a;
+  --sidebar-accent: #1a1a1a;
+  --sidebar-accent-foreground: #e5e5e5;
+  --sidebar-border: #262626;
+  --sidebar-ring: #525252;
 }
 
 @theme inline {
@@ -475,5 +489,91 @@ body {
     --mouse-glow-opacity: var(--mouse-glow-active-opacity, 0.45) !important;
     --mouse-glow-size: 120px !important;
     transition: opacity 0.1s ease !important;
+  }
+}
+
+/* Animated Manage Officers Button Styles */
+.manage-officers-btn {
+  min-width: 300px;
+  min-height: 60px;
+  display: inline-flex;
+  font-family: inherit;
+  font-size: 18px;
+  align-items: center;
+  justify-content: center;
+  text-transform: uppercase;
+  text-align: center;
+  letter-spacing: 1.3px;
+  font-weight: 700;
+  color: #070b19;
+  background: linear-gradient(90deg, rgba(129,230,217,1) 0%, rgba(79,209,197,1) 100%);
+  border: none;
+  border-radius: 1000px;
+  box-shadow: 0 12px 24px rgba(79,209,197,.64);
+  transition: all 0.3s ease-in-out 0s;
+  cursor: pointer;
+  outline: none;
+  position: relative;
+  padding: 10px 24px;
+  z-index: 10;
+}
+
+.manage-officers-btn::before {
+  content: '';
+  border-radius: 1000px;
+  width: calc(100% + 12px);
+  height: calc(100% + 12px);
+  inset: auto;
+  border: 6px solid #00FFCB;
+  box-shadow: 0 0 60px rgba(0,255,203,.64);
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  opacity: 0;
+  transition: all .3s ease-in-out 0s;
+  pointer-events: none;
+}
+
+.manage-officers-btn:hover, .manage-officers-btn:focus {
+  color: #070b19;
+  transform: translateY(-6px);
+}
+
+.manage-officers-btn:hover::before, .manage-officers-btn:focus::before {
+  opacity: 1;
+}
+
+.manage-officers-btn::after {
+  content: '';
+  width: 30px;
+  height: 30px;
+  inset: auto;
+  border-radius: 100%;
+  border: 6px solid #00FFCB;
+  position: absolute;
+  z-index: -1;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  animation: btn-ring 1.5s infinite;
+  pointer-events: none;
+}
+
+.manage-officers-btn:hover::after, .manage-officers-btn:focus::after {
+  animation: none;
+  display: none;
+}
+
+@keyframes btn-ring {
+  0% {
+    width: 30px;
+    height: 30px;
+    opacity: 1;
+  }
+  100% {
+    width: 100%;
+    height: 300px;
+    opacity: 0;
   }
 }

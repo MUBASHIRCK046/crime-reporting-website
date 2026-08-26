@@ -37,7 +37,9 @@ import {
   Rss,
   Play,
   UserCheck,
-  AlertCircle
+  AlertCircle,
+  Building2,
+  Mail
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -1166,6 +1168,272 @@ export default function LandingPage() {
 
           </div>
 
+        </div>
+      </section>
+
+      {/* MUKKOM POLICE STATION DETAILS SECTION */}
+      <section className="relative z-10 max-w-7xl mx-auto px-6 py-12">
+        <div className="text-center mb-10">
+          <span className="text-[10px] font-black text-blue-600 dark:text-blue-400 tracking-widest uppercase">Kozhikode Rural Police District</span>
+          <h3 className="text-2xl font-extrabold text-slate-900 dark:text-white mt-1">Mukkom Police Station</h3>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          
+          {/* STATION INFO & CONTACT */}
+          <div className="border border-slate-200 dark:border-white/5 rounded-3xl p-6 bg-slate-50/50 dark:bg-slate-950/20 backdrop-blur-xl relative flex flex-col justify-between overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+            <div className="absolute top-0 right-0 w-[40%] h-[150%] bg-gradient-to-r from-transparent via-blue-500/5 to-transparent skew-x-12 pointer-events-none" />
+            
+            <div>
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-blue-500/10 border border-blue-500/20 rounded-xl flex items-center justify-center">
+                    <Building2 className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-wide">Command Center</h4>
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400 font-bold mt-0.5">MUKKOM STATION DESK</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5 bg-emerald-500/10 px-3 py-1.5 rounded-full border border-emerald-500/20">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">Open 24/7</span>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div className="bg-white dark:bg-slate-950/50 border border-slate-200 dark:border-white/5 p-4 rounded-2xl flex items-start gap-3">
+                  <MapPin className="w-4 h-4 text-blue-500 mt-0.5 shrink-0" />
+                  <div>
+                    <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">Official Address</p>
+                    <p className="text-xs font-medium text-slate-800 dark:text-slate-200 leading-relaxed">
+                      Koyilandy - Edavanna Road, Health Centre Road,<br />
+                      Mukkom Post, Kozhikode, Kerala - 673602
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-white dark:bg-slate-950/50 border border-slate-200 dark:border-white/5 p-4 rounded-2xl hover:border-blue-500/30 transition-colors">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Phone className="w-3.5 h-3.5 text-indigo-500" />
+                      <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Mobile</p>
+                    </div>
+                    <a href="tel:9497947245" className="text-sm font-bold text-slate-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors">9497947245</a>
+                  </div>
+                  
+                  <div className="bg-white dark:bg-slate-950/50 border border-slate-200 dark:border-white/5 p-4 rounded-2xl hover:border-blue-500/30 transition-colors">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Phone className="w-3.5 h-3.5 text-indigo-500" />
+                      <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Landline</p>
+                    </div>
+                    <a href="tel:04952297133" className="text-sm font-bold text-slate-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors">0495-2297133</a>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="bg-white dark:bg-slate-950/50 border border-slate-200 dark:border-white/5 p-4 rounded-2xl">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Radio className="w-3.5 h-3.5 text-emerald-500" />
+                      <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">VPN</p>
+                    </div>
+                    <p className="text-sm font-mono font-bold text-slate-900 dark:text-white">15229</p>
+                  </div>
+                  
+                  <div className="bg-white dark:bg-slate-950/50 border border-slate-200 dark:border-white/5 p-4 rounded-2xl hover:border-blue-500/30 transition-colors">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Mail className="w-3.5 h-3.5 text-purple-500" />
+                      <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Email</p>
+                    </div>
+                    <a href="mailto:shomukkmkkdrl.pol@kerala.gov.in" className="text-[11px] font-medium text-slate-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 truncate block transition-colors" title="shomukkmkkdrl.pol@kerala.gov.in">shomukkmkkdrl.pol@kerala.gov.in</a>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* JURISDICTION & DEMOGRAPHICS */}
+          <div className="border border-slate-200 dark:border-white/5 rounded-3xl p-6 bg-slate-50/50 dark:bg-slate-950/20 backdrop-blur-xl relative flex flex-col justify-between overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+            <div className="absolute bottom-0 left-0 w-[60%] h-[60%] bg-indigo-500/5 dark:bg-indigo-500/10 blur-[60px] pointer-events-none rounded-full" />
+            
+            <div>
+              <div className="flex items-center justify-between mb-5">
+                <div className="flex items-center gap-2">
+                  <Shield className="w-4 h-4 text-indigo-500" />
+                  <span className="text-[10px] font-black text-slate-500 dark:text-slate-400 tracking-widest uppercase">Jurisdiction Profile</span>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                
+                {/* Area & Population */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-white dark:bg-slate-950/50 border border-slate-200 dark:border-white/5 p-3.5 rounded-2xl">
+                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Total Area</p>
+                    <p className="text-sm font-black text-slate-800 dark:text-slate-200 flex items-baseline gap-1">
+                      89.63 <span className="text-[10px] font-semibold text-slate-500">sq. km</span>
+                    </p>
+                  </div>
+                  <div className="bg-white dark:bg-slate-950/50 border border-slate-200 dark:border-white/5 p-3.5 rounded-2xl">
+                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Population</p>
+                    <p className="text-sm font-black text-slate-800 dark:text-slate-200 flex items-baseline gap-1">
+                      102,312 <span className="text-[10px] font-semibold text-slate-500">citizens</span>
+                    </p>
+                  </div>
+                </div>
+
+                {/* Local Bodies */}
+                <div className="bg-white dark:bg-slate-950/50 border border-slate-200 dark:border-white/5 p-4 rounded-2xl space-y-3">
+                  <div>
+                    <div className="flex items-center gap-1.5 mb-1.5">
+                      <Building2 className="w-3.5 h-3.5 text-blue-500" />
+                      <p className="text-[10px] font-bold text-slate-700 dark:text-slate-300 uppercase">Municipality & Panchayaths</p>
+                    </div>
+                    <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed font-medium pl-5">
+                      Mukkom Municipality, Karassery Grama Panchayath, Kodiyathoor Grama Panchayath
+                    </p>
+                  </div>
+                  
+                  <div className="border-t border-slate-100 dark:border-white/5 pt-3">
+                    <div className="flex items-center gap-1.5 mb-1.5">
+                      <Map className="w-3.5 h-3.5 text-purple-500" />
+                      <p className="text-[10px] font-bold text-slate-700 dark:text-slate-300 uppercase">Covered Villages</p>
+                    </div>
+                    <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed font-medium pl-5">
+                      Thazhekode, Neeleswaram, Kumaranelloor, Kakkad, Kodiyathor
+                    </p>
+                  </div>
+                </div>
+
+                {/* Borders */}
+                <div className="bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-500/10 p-3.5 rounded-2xl flex items-start gap-3">
+                  <AlertCircle className="w-4 h-4 text-indigo-500 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider mb-1">Border Districts</p>
+                    <p className="text-xs font-medium text-slate-700 dark:text-slate-300 leading-relaxed">
+                      Shares borders with Malappuram and Kozhikode City Police Districts.
+                    </p>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      {/* MUKKOM POLICE STATION INFO SECTION */}
+      <section className="relative z-10 max-w-7xl mx-auto px-6 py-12">
+        <div className="text-center mb-10">
+          <span className="text-[10px] font-black text-blue-600 dark:text-blue-400 tracking-widest uppercase">Kozhikode Rural</span>
+          <h3 className="text-2xl font-extrabold text-slate-900 dark:text-white mt-1">Mukkom Police Station</h3>
+        </div>
+
+        <div className="border border-slate-200 dark:border-white/5 rounded-3xl bg-white/60 dark:bg-slate-950/20 backdrop-blur-xl relative overflow-hidden">
+          <div className="absolute top-0 w-full h-1 bg-gradient-to-r from-blue-600 to-indigo-600" />
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-8 relative z-10">
+            {/* Contact Info */}
+            <div className="space-y-6">
+              <div className="flex items-start gap-4">
+                <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center shrink-0">
+                  <Phone className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">Emergency Lines</p>
+                  <p className="text-sm font-semibold text-slate-900 dark:text-white mb-0.5">Mobile: <a href="tel:9497947245" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">9497947245</a></p>
+                  <p className="text-sm font-semibold text-slate-900 dark:text-white mb-0.5">Landline: <a href="tel:04952297133" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">0495-2297133</a></p>
+                  <p className="text-xs text-slate-500 font-mono mt-1">VPN: 15229</p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-4">
+                <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center shrink-0">
+                  <Mail className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">Official Email</p>
+                  <a href="mailto:shomukkmkkdrl.pol@kerala.gov.in" className="text-sm font-semibold text-slate-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors break-all">shomukkmkkdrl.pol@kerala.gov.in</a>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-4">
+                <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center shrink-0">
+                  <Clock className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">Operating Hours</p>
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-500/10 border border-emerald-500/20">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping absolute" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                    <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">OPEN 24 HOURS, 7 DAYS A WEEK</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Location Info */}
+            <div className="space-y-6">
+              <div className="flex items-start gap-4">
+                <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center shrink-0">
+                  <MapPin className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">Station Address</p>
+                  <p className="text-sm font-semibold text-slate-900 dark:text-white leading-relaxed">
+                    Koyilandy - Edavanna Road, <br/>
+                    Health Centre Road, Mukkom Post, <br/>
+                    Kozhikode, Kerala - 673602
+                  </p>
+                  <a href="https://maps.google.com/?q=Mukkom+Police+Station+Kerala" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs font-bold text-blue-600 dark:text-blue-400 mt-2 hover:underline">
+                    View on Map <ChevronRight className="w-3 h-3" />
+                  </a>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-4">
+                <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center shrink-0">
+                  <Map className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">Jurisdiction Metrics</p>
+                  <p className="text-sm font-semibold text-slate-900 dark:text-white mb-0.5">Total Area: <span className="font-normal text-slate-600 dark:text-slate-400">89.63 sq km</span></p>
+                  <p className="text-sm font-semibold text-slate-900 dark:text-white mb-0.5">Population: <span className="font-normal text-slate-600 dark:text-slate-400">102,312 citizens</span></p>
+                </div>
+              </div>
+            </div>
+
+            {/* Jurisdiction Details */}
+            <div className="space-y-6 lg:border-l border-slate-200 dark:border-white/5 lg:pl-6">
+              <div className="flex items-start gap-4">
+                <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center shrink-0">
+                  <Shield className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2">Covered Territories</p>
+                  <div className="space-y-3">
+                    <div>
+                      <span className="text-[9px] font-bold text-slate-400 uppercase">Municipality</span>
+                      <p className="text-xs font-semibold text-slate-900 dark:text-white">Mukkom Municipality</p>
+                    </div>
+                    <div>
+                      <span className="text-[9px] font-bold text-slate-400 uppercase">Grama Panchayaths</span>
+                      <p className="text-xs font-semibold text-slate-900 dark:text-white">Karassery & Kodiyathoor</p>
+                    </div>
+                    <div>
+                      <span className="text-[9px] font-bold text-slate-400 uppercase">Villages</span>
+                      <p className="text-xs font-semibold text-slate-900 dark:text-white">Thazhekode, Neeleswaram, Kumaranelloor, Kakkad, Kodiyathor</p>
+                    </div>
+                    <div>
+                      <span className="text-[9px] font-bold text-slate-400 uppercase">Bordering Districts</span>
+                      <p className="text-xs font-semibold text-slate-900 dark:text-white">Malappuram & Kozhikode City</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 

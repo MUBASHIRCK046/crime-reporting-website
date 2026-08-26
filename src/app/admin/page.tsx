@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { auth, db } from "@/firebase/client";
-import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, updateDoc, collection, query, onSnapshot } from "firebase/firestore";
 import { getAllComplaints } from "@/lib/police";
 import { getAllUsers, assignCaseToOfficer, updatePoliceOfficerProfile, assignUserAsPolice } from "@/lib/admin";
 import { logoutUser } from "@/lib/auth";
@@ -14,11 +14,16 @@ import { CaseLog } from "@/lib/types";
 import { 
   Shield, LayoutDashboard, Users, Grid, FileText, 
   FileSignature, FileKey, BarChart2, LogOut, Loader2,
-  AlertCircle, RefreshCw, CheckCircle2, Clock, MapPin, Eye, EyeOff, X, Image as ImageIcon, User, Phone, Droplet, HeartPulse, Map, Calendar, Briefcase, Globe, Fingerprint, Search, Download, Printer, Save, Edit, Trash2, RotateCcw, Upload, Key, Power, Send, UserPlus, UserCheck, ShieldCheck, Award, Star, GraduationCap, Building2, Copy, Check, Lock, Sparkles, FileSpreadsheet
+  AlertCircle, RefreshCw, CheckCircle2, Clock, MapPin, Eye, EyeOff, X, Image as ImageIcon, User, Phone, Droplet, HeartPulse, Map, Calendar, Briefcase, Globe, Fingerprint, Search, Download, Printer, Save, Edit, Trash2, RotateCcw, Upload, Key, Power, Send, UserPlus, UserCheck, ShieldCheck, Award, Star, GraduationCap, Building2, Copy, Check, Lock, Sparkles, FileSpreadsheet,
+  ShieldAlert, Mail, Radio, ChevronRight
 } from "lucide-react";
+import dynamic from "next/dynamic";
 import { exportCaseToPDF, printCaseDetails } from "@/lib/export";
 import { motion } from "framer-motion";
 import { MorphingCard, StatusDonutChart } from "@/components/MorphingStats";
+import AnalyticsChart from "@/components/AnalyticsChart";
+
+const SafetyMap = dynamic(() => import("@/components/SafetyMap").then(mod => mod.SafetyMap), { ssr: false, loading: () => <div className="h-[500px] w-full flex items-center justify-center bg-slate-900/20 rounded-xl border border-white/10 animate-pulse text-slate-400 font-bold">Loading Map...</div> });
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -30,6 +35,10 @@ export default function AdminDashboard() {
   const [usersData, setUsersData] = useState<any[]>([]);
   const [userSearchQuery, setUserSearchQuery] = useState("");
   const [userRoleFilter, setUserRoleFilter] = useState("ALL");
+
+  // SOS Alerts States
+  const [sosAlertsData, setSosAlertsData] = useState<any[]>([]);
+  const [selectedAlert, setSelectedAlert] = useState<any | null>(null);
 
   // Credentials Generator States
   const [generatorSelectedOfficer, setGeneratorSelectedOfficer] = useState("");
@@ -166,6 +175,63 @@ export default function AdminDashboard() {
     checkAuthAndFetchData();
   }, [router]);
 
+  // Real-time SOS Alerts Listener
+  useEffect(() => {
+    const q = query(collection(db, "sos_alerts"));
+    let isInitialLoad = true;
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      snapshot.docChanges().forEach((change) => {
+        if (change.type === "added") {
+          const alertData: any = { id: change.doc.id, ...change.doc.data() };
+          
+          if (!isInitialLoad && alertData.status === "Active") {
+            // Trigger emergency Sonner notification
+            toast.custom((t) => (
+              <div className="bg-red-950 border-2 border-red-500 rounded-xl p-4 shadow-2xl flex flex-col gap-2 text-white animate-bounce">
+                <div className="flex items-center gap-2">
+                  <span className="text-xl">🚨</span>
+                  <h3 className="font-extrabold text-sm tracking-wide text-red-100">NEW SOS ALERT</h3>
+                </div>
+                <p className="text-xs text-red-200">
+                  <strong>{alertData.citizenName || "Unknown Citizen"}</strong> has triggered an emergency SOS.
+                </p>
+                {alertData.citizenAddress && alertData.citizenAddress !== "N/A" && (
+                  <p className="text-[10px] text-red-350 font-mono">Location: {alertData.citizenAddress}</p>
+                )}
+                <p className="text-[10px] text-red-350 font-mono">
+                  Time: {new Date(alertData.createdAt || alertData.timestamp).toLocaleTimeString()}
+                </p>
+                <button
+                  onClick={() => {
+                    setActiveTab("SOS");
+                    setSelectedAlert(alertData);
+                    toast.dismiss(t);
+                  }}
+                  className="mt-1 bg-red-600 hover:bg-red-550 text-white font-bold py-1.5 px-3 rounded-lg text-[10px] transition-all self-end cursor-pointer"
+                >
+                  VIEW SOS
+                </button>
+              </div>
+            ), { duration: 15000 });
+          }
+        }
+      });
+
+      // Map snapshot docs to state
+      const alerts: any[] = [];
+      snapshot.docs.forEach((doc) => {
+        alerts.push({ id: doc.id, ...doc.data() });
+      });
+      // Sort newest first
+      alerts.sort((a, b) => new Date(b.createdAt || b.timestamp).getTime() - new Date(a.createdAt || a.timestamp).getTime());
+      setSosAlertsData(alerts);
+      isInitialLoad = false;
+    });
+
+    return () => unsubscribe();
+  }, []);
+
   // Fetch citizen profile and case logs when a complaint is selected
   useEffect(() => {
     const fetchCitizenDetailsAndLogs = async () => {
@@ -243,6 +309,33 @@ export default function AdminDashboard() {
   const handleLogout = async () => {
     await logoutUser();
     router.push("/login");
+  };
+
+  const handleUpdateSOSStatus = async (alertId: string, newStatus: string) => {
+    try {
+      const alertRef = doc(db, "sos_alerts", alertId);
+      const updates: any = { status: newStatus };
+      if (newStatus === "Acknowledged") {
+        updates.acknowledgedAt = new Date().toISOString();
+      } else if (newStatus === "Responding") {
+        updates.respondingAt = new Date().toISOString();
+      } else if (newStatus === "Resolved") {
+        updates.resolvedAt = new Date().toISOString();
+      }
+      
+      await updateDoc(alertRef, updates);
+      
+      // Update locally immediately to ensure instant UI response
+      setSosAlertsData((prev: any[]) => prev.map(a => a.id === alertId ? { ...a, ...updates } : a));
+      if (selectedAlert?.id === alertId) {
+        setSelectedAlert((prev: any | null) => prev ? { ...prev, ...updates } : null);
+      }
+      
+      toast.success(`SOS Alert status updated to ${newStatus}`);
+    } catch (err: any) {
+      console.error("Error updating SOS status:", err);
+      toast.error(`Failed to update status: ${err.message}`);
+    }
   };
 
   const handleAssignOfficer = async () => {
@@ -1488,6 +1581,182 @@ export default function AdminDashboard() {
     );
   };
 
+  const renderSOSAlertsSection = () => {
+    const activeCount = sosAlertsData.filter(a => a.status === "Active").length;
+    const acknowledgedCount = sosAlertsData.filter(a => a.status === "Acknowledged").length;
+    const respondingCount = sosAlertsData.filter(a => a.status === "Responding").length;
+    const resolvedCount = sosAlertsData.filter(a => a.status === "Resolved").length;
+
+    return (
+      <div className="space-y-6 relative z-10 text-slate-100">
+        {/* KPI stats */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="glass-panel p-5 border border-red-500/20 shadow-sm relative overflow-hidden bg-slate-900/40">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-wider text-red-400">🔴 Active</p>
+                <p className="text-3xl font-black text-slate-100 mt-1">{activeCount}</p>
+              </div>
+            </div>
+          </div>
+          <div className="glass-panel p-5 border border-yellow-500/20 shadow-sm relative overflow-hidden bg-slate-900/40">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-wider text-yellow-400">🟡 Acknowledged</p>
+                <p className="text-3xl font-black text-slate-100 mt-1">{acknowledgedCount}</p>
+              </div>
+            </div>
+          </div>
+          <div className="glass-panel p-5 border border-blue-500/20 shadow-sm relative overflow-hidden bg-slate-900/40">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-wider text-blue-400">🔵 Responding</p>
+                <p className="text-3xl font-black text-slate-100 mt-1">{respondingCount}</p>
+              </div>
+            </div>
+          </div>
+          <div className="glass-panel p-5 border border-emerald-500/20 shadow-sm relative overflow-hidden bg-slate-900/40">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-400">🟢 Resolved</p>
+                <p className="text-3xl font-black text-slate-100 mt-1">{resolvedCount}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Main Content Area: Split List and Map */}
+        <div className="flex flex-col lg:flex-row gap-6 h-[500px]">
+          {/* Left Column: SOS Alert Cards (scrollable list) */}
+          <div className="flex-1 lg:max-w-[420px] overflow-y-auto space-y-4 pr-2 scrollbar-thin scrollbar-thumb-slate-800">
+            {sosAlertsData.length === 0 ? (
+              <div className="glass-panel p-12 text-center text-slate-400 border-dashed">
+                <ShieldAlert className="w-10 h-10 mx-auto mb-3 opacity-30 text-slate-400" />
+                <p className="font-semibold text-sm">No SOS Alerts Registered</p>
+              </div>
+            ) : (
+              sosAlertsData.map((alert) => {
+                const isSelected = selectedAlert?.id === alert.id;
+                return (
+                  <div
+                    key={alert.id}
+                    onClick={() => setSelectedAlert(alert)}
+                    className={`glass-panel p-5 border cursor-pointer transition-all ${
+                      isSelected 
+                        ? "border-red-500/40 bg-red-950/10 shadow-lg" 
+                        : "border-white/10 bg-slate-900/20 hover:bg-white/5"
+                    }`}
+                  >
+                    <div className="flex justify-between items-start mb-3">
+                      <span className="font-black text-xs text-red-500 flex items-center gap-1">
+                        🚨 EMERGENCY SOS
+                      </span>
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase border ${
+                        alert.status === "Active" ? "bg-red-500/25 text-red-400 border-red-500/40 animate-pulse" :
+                        alert.status === "Acknowledged" ? "bg-yellow-500/25 text-yellow-400 border-yellow-500/40" :
+                        alert.status === "Responding" ? "bg-blue-500/25 text-blue-400 border-blue-500/40" :
+                        "bg-emerald-500/25 text-emerald-400 border-emerald-500/40"
+                      }`}>
+                        {alert.status}
+                      </span>
+                    </div>
+
+                    <div className="space-y-1.5 text-xs text-slate-300 mb-4">
+                      <p><span className="font-bold text-slate-400">Citizen:</span> <span className="font-semibold text-slate-100">{alert.citizenName}</span></p>
+                      <p><span className="font-bold text-slate-400">Citizen ID:</span> <span className="font-mono">{alert.citizenId.substring(0, 12).toUpperCase()}</span></p>
+                      <p><span className="font-bold text-slate-400">Phone:</span> {alert.citizenPhone}</p>
+                      <p><span className="font-bold text-slate-400">Email:</span> {alert.citizenEmail}</p>
+                      {alert.citizenAddress && alert.citizenAddress !== "N/A" && (
+                        <p className="truncate"><span className="font-bold text-slate-400">Address:</span> {alert.citizenAddress}</p>
+                      )}
+                      <p><span className="font-bold text-slate-400">Date:</span> {new Date(alert.createdAt || alert.timestamp).toLocaleDateString()}</p>
+                      <p><span className="font-bold text-slate-400">Time:</span> {new Date(alert.createdAt || alert.timestamp).toLocaleTimeString()}</p>
+                      <p className="font-mono text-[10px] text-slate-500">Lat: {alert.latitude?.toFixed(4)}, Lng: {alert.longitude?.toFixed(4)}</p>
+                    </div>
+
+                    <div className="border-t border-white/5 pt-3 flex flex-wrap gap-2 items-center">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedAlert(alert);
+                        }}
+                        className="px-2.5 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white text-[10px] font-bold shadow-md shadow-red-600/20 transition-all flex items-center gap-1 cursor-pointer"
+                      >
+                        <MapPin className="w-3 h-3" />
+                        <span>View on Map</span>
+                      </button>
+                      <button
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          setIsProfileModalOpen(true);
+                          setFetchingProfile(true);
+                          const { profile } = await getUserProfile(alert.citizenId);
+                          setSelectedCitizenProfile(profile);
+                          setFetchingProfile(false);
+                        }}
+                        className="px-2.5 py-1.5 rounded-lg bg-slate-900 border border-white/5 hover:bg-slate-800 text-slate-200 text-[10px] font-bold transition-all cursor-pointer"
+                      >
+                        View Profile
+                      </button>
+                      
+                      <div className="ml-auto flex gap-1">
+                        {alert.status === "Active" && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleUpdateSOSStatus(alert.id, "Acknowledged");
+                            }}
+                            className="px-2.5 py-1.5 rounded-lg bg-yellow-600 hover:bg-yellow-500 text-white text-[10px] font-bold shadow-md shadow-yellow-600/20 transition-all cursor-pointer"
+                          >
+                            Acknowledge
+                          </button>
+                        )}
+                        
+                        {alert.status === "Acknowledged" && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleUpdateSOSStatus(alert.id, "Responding");
+                            }}
+                            className="px-2.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-bold shadow-md shadow-blue-600/20 transition-all cursor-pointer"
+                          >
+                            Respond
+                          </button>
+                        )}
+
+                        {(alert.status === "Active" || alert.status === "Acknowledged" || alert.status === "Responding") && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleUpdateSOSStatus(alert.id, "Resolved");
+                            }}
+                            className="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-550 text-white text-[10px] font-bold shadow-md shadow-emerald-650/20 transition-all cursor-pointer"
+                          >
+                            Resolve
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          {/* Right Column: Existing Map Reused */}
+          <div className="flex-1 rounded-2xl overflow-hidden border border-white/10 relative h-full min-h-[300px]">
+            <SafetyMap
+              sosAlerts={sosAlertsData.filter(a => a.status !== "Resolved")}
+              selectedAlertId={selectedAlert?.id || null}
+              onAlertMarkerClick={(alert) => setSelectedAlert(alert)}
+              hideDetails={true}
+            />
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center transition-colors duration-300">
@@ -1500,80 +1769,55 @@ export default function AdminDashboard() {
   const policeCount = usersData.filter(u => u.role === "police").length;
   const adminCount = usersData.filter(u => u.role === "admin").length;
 
+  const policeOfficers = usersData.filter(u => u.role === "police");
+  const activeCount = policeOfficers.filter(p => (p.serviceStatus || p.dutyStatus || "Active").toLowerCase().includes("active")).length;
+  const stationsCount = new Set(policeOfficers.map(p => p.stationName).filter(Boolean)).size;
+  const totalSolved = policeOfficers.reduce((acc, p) => acc + (Number(p.casesSolved) || 0), 0);
+
+  const defaultOfficers = [
+    { uid: "p1", name: "Inspector Ramesh Kumar", policeId: "POL-2026-9812", badgeNumber: "9812", rank: "Inspector", stationName: "Central Police Station", serviceStatus: "Active", casesSolved: 32, casesHandled: 35 },
+    { uid: "p2", name: "SI Ananya Sen", policeId: "POL-2026-4421", badgeNumber: "4421", rank: "Sub-Inspector", stationName: "Cyber Crime Precinct", serviceStatus: "Active", casesSolved: 28, casesHandled: 30 },
+    { uid: "p3", name: "Constable Vikram Rathore", policeId: "POL-2026-1109", badgeNumber: "1109", rank: "Constable", stationName: "Central Police Station", serviceStatus: "On Leave", casesSolved: 14, casesHandled: 16 },
+    { uid: "p4", name: "SI David Gonsalves", policeId: "POL-2026-5778", badgeNumber: "5778", rank: "Sub-Inspector", stationName: "Metro Traffic Division", serviceStatus: "Active", casesSolved: 25, casesHandled: 28 },
+    { uid: "p5", name: "Constable Sunita Deshmukh", policeId: "POL-2026-2341", badgeNumber: "2341", rank: "Constable", stationName: "West Precinct Station", serviceStatus: "Off Duty", casesSolved: 22, casesHandled: 24 }
+  ];
+
+  const displayOfficers = policeOfficers.length > 0 
+    ? [...policeOfficers, ...defaultOfficers.slice(policeOfficers.length)].slice(0, 5)
+    : defaultOfficers;
+
   return (
     <motion.div 
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.6, ease: "easeInOut" }}
-      className="min-h-screen bg-background text-text-primary flex transition-colors duration-300"
+      className="min-h-screen bg-[#040815] text-[#f1f5f9] flex transition-colors duration-300 font-sans w-full"
     >
-      {/* SIDEBAR */}
-      <aside className="w-[260px] glass-panel h-screen rounded-none flex flex-col fixed left-0 top-0 transition-colors duration-300 z-20 shadow-lg border-r border-white/20">
-        <div className="p-6 border-b border-white/10 flex items-center gap-3 bg-black/5 dark:bg-white/5">
-          <div className="w-8 h-8 rounded-full border-2 border-emerald-500/50 flex items-center justify-center bg-emerald-500/20 backdrop-blur-sm">
-            <Shield className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-          </div>
-          <span className="font-bold tracking-wide text-text-primary drop-shadow-sm">System Administrator</span>
-        </div>
-        
-        <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
-          <button 
-            onClick={() => setActiveTab("Dashboard")}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all ${
-              activeTab === "Dashboard" ? "glass-button shadow-md shadow-emerald-500/20" : "text-text-secondary hover:text-text-primary hover:bg-ui-bg"
-            }`}
-          >
-            <LayoutDashboard className="w-5 h-5" />
-            Dashboard
-          </button>
-
-          {/* DEDICATED POLICE OFFICER MANAGEMENT TAB */}
-          <button 
-            onClick={() => setActiveTab("Police Officer Management")}
-            className={`w-full flex items-center justify-between px-4 py-3 rounded-xl font-medium transition-all ${
-              activeTab === "Police Officer Management" 
-                ? "glass-button shadow-md shadow-purple-500/20 border-purple-500/30 text-purple-600 dark:text-purple-400" 
-                : "text-text-secondary hover:text-text-primary hover:bg-ui-bg"
-            }`}
-          >
-            <div className="flex items-center gap-3">
-              <Shield className="w-5 h-5 text-purple-500" />
-              <span>Police Management</span>
-            </div>
-            <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-600 dark:text-purple-400 font-mono font-bold">
-              {usersData.filter(u => u.role === 'police').length}
-            </span>
-          </button>
-          
-          {[
-            { icon: Users, label: "Users" },
-            { icon: FileText, label: "Complaints" },
-            { icon: FileSignature, label: "FIR" },
-            { icon: FileKey, label: "CSR" },
-          ].map((item) => (
-            <button 
-              key={item.label} 
-              onClick={() => setActiveTab(item.label)}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
-                activeTab === item.label ? "glass-button shadow-md shadow-emerald-500/20" : "text-text-secondary hover:text-text-primary hover:bg-ui-bg"
-              }`}
-            >
-              <item.icon className="w-5 h-5" />
-              {item.label === "Users" ? "Citizen Management" : item.label}
-            </button>
-          ))}
-        </nav>
-
-        <div className="p-6 mt-auto border-t border-white/10">
-          <button onClick={handleLogout} className="flex items-center gap-3 text-text-secondary hover:text-text-primary transition-colors w-full px-4 py-2 hover:bg-ui-bg rounded-lg">
-            <LogOut className="w-5 h-5" />
-            Sign Out
-          </button>
-        </div>
-      </aside>
-
       {/* MAIN CONTENT */}
-      <main className="flex-1 ml-[260px] p-8 md:p-12 min-h-screen relative overflow-hidden">
+      <main className="flex-1 p-8 md:p-12 min-h-screen relative overflow-hidden pb-32">
+        {/* Top Branding Header */}
+        <div className="max-w-6xl mx-auto relative z-10 mb-8 flex items-center justify-between bg-slate-900/30 p-4 rounded-2xl border border-white/5 backdrop-blur-sm">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full border-2 border-cyan-500/30 flex items-center justify-center bg-cyan-500/10 backdrop-blur-sm shadow-[0_0_15px_rgba(6,182,212,0.2)]">
+              <Shield className="w-5 h-5 text-cyan-400" />
+            </div>
+            <div>
+              <span className="font-black text-lg tracking-wide text-slate-100 drop-shadow-sm uppercase block leading-tight">Precinct Command</span>
+              <span className="text-[10px] font-bold text-cyan-400 tracking-widest uppercase">Admin Operations</span>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-4">
+            {/* Sign Out Button in Header */}
+            <button onClick={handleLogout} className="flex items-center gap-2 px-3 py-2 md:px-4 md:py-2 text-red-500 bg-red-500/10 border border-red-500/20 hover:bg-red-500/20 hover:text-red-400 transition-all rounded-xl cursor-pointer group shadow-[0_0_15px_rgba(239,68,68,0.15)] hover:shadow-[0_0_25px_rgba(239,68,68,0.3)] shrink-0">
+              <LogOut className="w-5 h-5 group-hover:drop-shadow-[0_0_8px_rgba(239,68,68,0.8)]" />
+              <span className="text-xs tracking-wide font-bold hidden sm:block">Sign Out</span>
+            </button>
+            <div className="w-10 h-10 rounded-full bg-slate-800 border-2 border-slate-700 overflow-hidden flex items-center justify-center text-slate-400 shrink-0">
+              <User className="w-5 h-5" />
+            </div>
+          </div>
+        </div>
         {/* Liquid Glass Background Blobs */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none z-0 opacity-30 dark:opacity-20">
           <motion.div
@@ -1619,101 +1863,440 @@ export default function AdminDashboard() {
 
         <div className="max-w-6xl mx-auto relative z-10">
           {activeTab === "Dashboard" ? (
-            <motion.h1 
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.7, ease: "easeInOut" }}
-              className="text-3xl font-black tracking-tight text-text-primary mb-8 drop-shadow-sm text-center bg-gradient-to-r from-text-primary via-emerald-600 to-teal-600 bg-clip-text text-transparent"
-            >
-              System Administrator
-            </motion.h1>
+            <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-white/5 pb-5 mb-8">
+              <div>
+                <motion.h1 
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.7, ease: "easeInOut" }}
+                  className="text-2xl font-black tracking-tight text-slate-100 flex items-center gap-2"
+                >
+                  <Shield className="w-6 h-6 text-cyan-400" />
+                  Police Officer Management
+                </motion.h1>
+                <p className="text-xs text-slate-400 mt-1">Precinct Administration, Officer Dispatch Grid, and Case Resolution Operations</p>
+              </div>
+              <div className="flex items-center gap-2 mt-4 md:mt-0 text-xs font-mono bg-slate-950/40 px-3 py-1.5 rounded-lg border border-white/5 text-slate-400">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                PRECINCT SECURE LINKED
+              </div>
+            </div>
           ) : (
-            <h1 className="text-2xl font-bold text-text-primary mb-6 drop-shadow-sm">
-              {activeTab === "Users" ? "Citizen & Users Management" : activeTab}
+            <h1 className="text-2xl font-bold text-slate-100 mb-6 flex items-center gap-2">
+              {activeTab === "Officers" ? <Shield className="w-5 h-5 text-cyan-400" /> : null}
+              {activeTab === "Police Stations" ? <Building2 className="w-5 h-5 text-cyan-400" /> : null}
+              {activeTab === "Cases" ? <FileText className="w-5 h-5 text-cyan-400" /> : null}
+              {activeTab === "Reports" ? <FileSpreadsheet className="w-5 h-5 text-cyan-400" /> : null}
+              {activeTab === "SOS" ? <ShieldAlert className="w-5 h-5 text-red-500 animate-pulse" /> : null}
+              <span>{activeTab === "Users" ? "Citizen & Users Registry" : activeTab === "SOS" ? "Emergency SOS Alerts Grid" : activeTab}</span>
             </h1>
           )}
 
           {activeTab === "Dashboard" ? (
-            <div className="flex flex-col lg:flex-row gap-8 py-6 items-start">
-              {/* Left Column: Morphing Stats Grid */}
-              <div className="flex-1 w-full">
-                {/* Morphing Stats Cards Section (Futuristic CSS Grid Layout) */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 my-6">
-                  <MorphingCard
-                    title="Total Complaints"
-                    value={stats.totalComplaints}
-                    points={[1, 2.5, 1.2, 3]} // Complaint trends
-                    color="blue"
-                    type="line"
-                    delay={0.05}
-                  />
-                  
-                  <MorphingCard
-                    title="Total FIRs"
-                    value={stats.totalFIRs}
-                    points={[1.2, 2.8, 1.8, 3.2, 2]} // FIR trends
-                    color="red"
-                    type="bar"
-                    delay={0.15}
-                  />
-                  
-                  <MorphingCard
-                    title="Total CSRs"
-                    value={stats.totalCSRs}
-                    points={[1, 1.8, 1.2, 2.5]} // CSR trends
-                    color="purple"
-                    type="area"
-                    delay={0.25}
-                  />
+            <div className="space-y-8 py-4">
+              {/* Original Morphing Cards & Status Donut Chart */}
+              <div className="flex flex-col lg:flex-row gap-8 py-2 items-start">
+                {/* Left Column: Morphing Stats Grid */}
+                <div className="flex-1 w-full">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 my-2">
+                    <MorphingCard
+                      title="Total Complaints"
+                      value={stats.totalComplaints}
+                      points={[1, 2.5, 1.2, 3]}
+                      color="blue"
+                      type="line"
+                      delay={0.05}
+                    />
+                    
+                    <MorphingCard
+                      title="Total FIRs"
+                      value={stats.totalFIRs}
+                      points={[1.2, 2.8, 1.8, 3.2, 2]}
+                      color="red"
+                      type="bar"
+                      delay={0.15}
+                    />
+                    
+                    <MorphingCard
+                      title="Total CSRs"
+                      value={stats.totalCSRs}
+                      points={[1, 1.8, 1.2, 2.5]}
+                      color="purple"
+                      type="area"
+                      delay={0.25}
+                    />
 
-                  <MorphingCard
-                    title="Total Users"
-                    value={citizenCount}
-                    points={[0.5, 1, 1.8, 3.2]} // Growth trends
-                    color="emerald"
-                    type="line"
-                    delay={0.35}
-                  />
+                    <MorphingCard
+                      title="Total Users"
+                      value={citizenCount}
+                      points={[0.5, 1, 1.8, 3.2]}
+                      color="emerald"
+                      type="line"
+                      delay={0.35}
+                    />
 
-                  <MorphingCard
-                    title="Total Police Officers"
-                    value={policeCount}
-                    points={[2, 1, 3, 1.5, 2.8]} // Activity trends
-                    color="indigo"
-                    type="area"
-                    delay={0.45}
-                  />
+                    <MorphingCard
+                      title="Total Police Officers"
+                      value={policeCount}
+                      points={[2, 1, 3, 1.5, 2.8]}
+                      color="indigo"
+                      type="area"
+                      delay={0.45}
+                    />
 
-                  <MorphingCard
-                    title="Total Administrators"
-                    value={adminCount}
-                    points={[1, 1.2, 1.5, 1.8, 2.2]} // Trend trends
-                    color="amber"
-                    type="line"
-                    delay={0.55}
+                    <MorphingCard
+                      title="Total Administrators"
+                      value={adminCount}
+                      points={[1, 1.2, 1.5, 1.8, 2.2]}
+                      color="amber"
+                      type="line"
+                      delay={0.55}
+                    />
+                  </div>
+                </div>
+
+                {/* Right Column: Case Status Breakdown */}
+                <div className="w-full lg:w-[280px] xl:w-[320px] shrink-0 lg:mt-2">
+                  <StatusDonutChart
+                    pending={stats.pending}
+                    inProgress={stats.inProgress}
+                    resolved={stats.resolved}
                   />
                 </div>
               </div>
 
-              {/* Right Column: Case Status Breakdown */}
-              <div className="w-full lg:w-[280px] xl:w-[320px] shrink-0 lg:mt-6">
-                <StatusDonutChart
-                  pending={stats.pending}
-                  inProgress={stats.inProgress}
-                  resolved={stats.resolved}
+              {/* Analytics Graph Row */}
+              <div className="w-full">
+                <AnalyticsChart 
+                  totalOfficers={policeOfficers.length || 5} 
+                  activeOfficers={activeCount || 5} 
+                  solvedCases={totalSolved || 121} 
+                  pendingCases={stats.pending || 3} 
                 />
               </div>
+
+              {/* Centered Main Call-To-Action Button */}
+              <div className="flex items-center justify-center py-8 w-full">
+                <div
+                  onClick={() => setActiveTab("Officers")}
+                  className="manage-officers-btn cursor-pointer font-extrabold uppercase select-none relative"
+                >
+                  Manage Officers Registry
+                </div>
+              </div>
+
+              {/* Officer Table Row */}
+              <div className="space-y-4 pt-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-bold uppercase tracking-wider text-slate-300">
+                      Officer Status Registry
+                    </h3>
+                    <p className="text-xs text-slate-400 mt-0.5">Realtime activity sync and precinct assignments</p>
+                  </div>
+                </div>
+
+                <div className="glass-panel overflow-hidden border border-white/10 bg-slate-900/40 shadow-xl rounded-2xl">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="bg-slate-950/20 text-[10px] uppercase tracking-wider text-slate-400 border-b border-white/5">
+                          <th className="px-6 py-4 font-bold">Officer</th>
+                          <th className="px-6 py-4 font-bold">Badge ID</th>
+                          <th className="px-6 py-4 font-bold">Rank</th>
+                          <th className="px-6 py-4 font-bold">Station</th>
+                          <th className="px-6 py-4 font-bold">Status</th>
+                          <th className="px-6 py-4 font-bold">Cases</th>
+                          <th className="px-6 py-4 font-bold text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/5 text-sm text-slate-200">
+                        {displayOfficers.map((officer, idx) => (
+                          <tr 
+                            key={officer.uid || idx} 
+                            className="hover:bg-cyan-500/[0.02] transition-colors group"
+                          >
+                            <td className="px-6 py-4">
+                              <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-full bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center font-bold text-xs text-cyan-400 shrink-0">
+                                  {officer.name ? officer.name.charAt(0).toUpperCase() : "P"}
+                                </div>
+                                <span className="font-semibold text-slate-100 group-hover:text-cyan-400 transition-colors">
+                                  {officer.name}
+                                </span>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 font-mono text-xs text-slate-400">
+                              {officer.policeId || officer.badgeNumber || "POL-2026-9812"}
+                            </td>
+                            <td className="px-6 py-4 text-xs font-semibold text-slate-300">
+                              {officer.rank || "Sub-Inspector"}
+                            </td>
+                            <td className="px-6 py-4 text-xs text-slate-400">
+                              {officer.stationName || "Central Station"}
+                            </td>
+                            <td className="px-6 py-4">
+                              {(() => {
+                                const stat = officer.serviceStatus || "Active";
+                                const isLeave = stat.toLowerCase().includes("leave");
+                                const isOff = stat.toLowerCase().includes("off") || stat.toLowerCase().includes("retired");
+                                return (
+                                  <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border backdrop-blur-sm ${
+                                    isLeave 
+                                      ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                                      : isOff 
+                                      ? "bg-slate-500/10 text-slate-400 border-slate-500/20"
+                                      : "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                                  }`}>
+                                    {stat}
+                                  </span>
+                                );
+                              })()}
+                            </td>
+                            <td className="px-6 py-4 text-xs font-mono">
+                              <span className="text-emerald-400 font-bold">{officer.casesSolved || 0}</span>
+                              <span className="text-slate-500"> / {officer.casesHandled || 0}</span>
+                            </td>
+                            <td className="px-6 py-4 text-right">
+                              <div className="inline-flex items-center gap-2">
+                                <button
+                                  onClick={async () => {
+                                    setIsPoliceProfileModalOpen(true);
+                                    setFetchingProfile(true);
+                                    const { profile } = await getUserProfile(officer.uid);
+                                    setSelectedPoliceProfile({ ...officer, ...profile });
+                                    setFetchingProfile(false);
+                                  }}
+                                  className="px-2.5 py-1 text-xs font-semibold bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/20 rounded-lg transition-colors cursor-pointer"
+                                >
+                                  View
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setOfficerToUpdate({ ...officer });
+                                    setIsUpdatePoliceModalOpen(true);
+                                  }}
+                                  className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg border border-white/5 transition-colors cursor-pointer"
+                                  title="Update Officer"
+                                >
+                                  <Edit className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setSelectedOfficerForCredentials({ ...officer });
+                                    setShowPasswordInModal(false);
+                                    setIsPoliceIdModalOpen(true);
+                                  }}
+                                  className="p-1.5 bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 rounded-lg border border-purple-500/20 transition-colors cursor-pointer"
+                                  title="Police ID"
+                                >
+                                  <Key className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
             </div>
-          ) : activeTab === "Police Officer Management" || activeTab === "Police Management" ? (
+          ) : activeTab === "Officers" || activeTab === "Police Officer Management" || activeTab === "Police Management" ? (
             renderPoliceManagementSection()
-          ) : activeTab === "Users" || activeTab === "Citizen Management" ? (
-            renderUsersTable()
-          ) : activeTab === "Complaints" ? (
-            renderComplaintsTable(null)
+          ) : activeTab === "Police Stations" ? (
+            <div className="space-y-6">
+              {/* Header Info */}
+              <div className="glass-panel p-6 bg-slate-900/40 border border-white/5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div>
+                  <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Kozhikode Rural</h4>
+                  <p className="text-3xl font-black text-white mt-1">Mukkom Police Station</p>
+                </div>
+                <div className="px-3 py-1.5 rounded-md bg-emerald-500/10 border border-emerald-500/20 flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping absolute" />
+                  <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                  <span className="text-xs font-bold text-emerald-400">OPEN 24 HOURS, 7 DAYS A WEEK</span>
+                </div>
+              </div>
+
+              {/* Main Info Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                
+                {/* Contact Info */}
+                <div className="glass-panel p-5 bg-slate-900/40 border border-white/5 space-y-4">
+                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Emergency Contact</h4>
+                  <div className="flex items-center gap-3">
+                    <Phone className="w-4 h-4 text-cyan-400" />
+                    <div>
+                      <p className="text-[10px] text-slate-500 uppercase font-bold">Mobile</p>
+                      <a href="tel:9497947245" className="text-sm font-bold text-slate-200 hover:text-cyan-400 transition-colors">9497947245</a>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Phone className="w-4 h-4 text-cyan-400" />
+                    <div>
+                      <p className="text-[10px] text-slate-500 uppercase font-bold">Landline</p>
+                      <a href="tel:04952297133" className="text-sm font-bold text-slate-200 hover:text-cyan-400 transition-colors">0495-2297133</a>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Radio className="w-4 h-4 text-cyan-400" />
+                    <div>
+                      <p className="text-[10px] text-slate-500 uppercase font-bold">VPN</p>
+                      <p className="text-sm font-bold text-slate-200">15229</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 pt-2 border-t border-white/5">
+                    <Mail className="w-4 h-4 text-purple-400" />
+                    <div className="w-full">
+                      <p className="text-[10px] text-slate-500 uppercase font-bold">Official Email</p>
+                      <a href="mailto:shomukkmkkdrl.pol@kerala.gov.in" className="text-xs font-bold text-slate-200 hover:text-purple-400 transition-colors block truncate" title="shomukkmkkdrl.pol@kerala.gov.in">shomukkmkkdrl.pol@kerala.gov.in</a>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Location & Jurisdiction Metrics */}
+                <div className="glass-panel p-5 bg-slate-900/40 border border-white/5 space-y-4">
+                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Location & Metrics</h4>
+                  <div className="flex items-start gap-3">
+                    <MapPin className="w-4 h-4 text-amber-400 mt-1 shrink-0" />
+                    <div>
+                      <p className="text-[10px] text-slate-500 uppercase font-bold">Address</p>
+                      <p className="text-xs font-medium text-slate-300 leading-relaxed mt-1">
+                        Koyilandy - Edavanna Road, <br/>
+                        Health Centre Road, Mukkom Post, <br/>
+                        Kozhikode, Kerala - 673602
+                      </p>
+                      <a href="https://maps.google.com/?q=Mukkom+Police+Station+Kerala" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[10px] font-bold text-cyan-400 mt-2 hover:underline uppercase">
+                        View on Map <ChevronRight className="w-3 h-3" />
+                      </a>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 pt-4 border-t border-white/5">
+                    <Map className="w-4 h-4 text-amber-400" />
+                    <div className="flex-1 flex justify-between items-center">
+                      <p className="text-xs font-bold text-slate-300">Total Area</p>
+                      <p className="text-xs font-bold text-amber-400">89.63 sq km</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 pt-2">
+                    <Users className="w-4 h-4 text-amber-400" />
+                    <div className="flex-1 flex justify-between items-center">
+                      <p className="text-xs font-bold text-slate-300">Population</p>
+                      <p className="text-xs font-bold text-amber-400">102,312</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Coverage Details */}
+                <div className="glass-panel p-5 bg-slate-900/40 border border-white/5">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Shield className="w-4 h-4 text-emerald-400" />
+                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Territory Details</h4>
+                  </div>
+                  <div className="space-y-4">
+                    <div>
+                      <p className="text-[10px] text-slate-500 uppercase font-bold">Municipality</p>
+                      <p className="text-xs font-medium text-slate-300">Mukkom Municipality</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-slate-500 uppercase font-bold">Grama Panchayaths</p>
+                      <p className="text-xs font-medium text-slate-300">Karassery & Kodiyathoor</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-slate-500 uppercase font-bold">Covered Villages</p>
+                      <p className="text-[11px] font-medium text-slate-300 leading-relaxed">Thazhekode, Neeleswaram, Kumaranelloor, Kakkad, Kodiyathor</p>
+                    </div>
+                    <div className="pt-2 border-t border-white/5">
+                      <p className="text-[10px] text-slate-500 uppercase font-bold">Bordering Districts</p>
+                      <p className="text-[11px] font-medium text-slate-300">Malappuram & Kozhikode City</p>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          ) : activeTab === "Cases" ? (
+            <div className="space-y-6">
+              <div className="flex gap-2 p-1 bg-slate-950/20 border border-white/5 rounded-xl max-w-sm">
+                {["All Cases", "FIR Only", "CSR Only"].map((tabLabel, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => {
+                      if (idx === 0) setActiveTab("Cases");
+                      else if (idx === 1) setActiveTab("FIR");
+                      else setActiveTab("CSR");
+                    }}
+                    className={`flex-1 py-1.5 text-[11px] font-bold uppercase rounded-lg transition-all cursor-pointer ${
+                      activeTab === "Cases" && idx === 0
+                        ? "bg-white/10 text-cyan-400 border border-white/10 shadow-sm"
+                        : "text-slate-400 hover:text-slate-200"
+                    }`}
+                  >
+                    {tabLabel}
+                  </button>
+                ))}
+              </div>
+              {renderComplaintsTable(null)}
+            </div>
           ) : activeTab === "FIR" ? (
-            renderComplaintsTable("FIR")
+            <div className="space-y-6">
+              <div className="flex gap-2 p-1 bg-slate-950/20 border border-white/5 rounded-xl max-w-sm">
+                {["All Cases", "FIR Only", "CSR Only"].map((tabLabel, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => {
+                      if (idx === 0) setActiveTab("Cases");
+                      else if (idx === 1) setActiveTab("FIR");
+                      else setActiveTab("CSR");
+                    }}
+                    className={`flex-1 py-1.5 text-[11px] font-bold uppercase rounded-lg transition-all cursor-pointer ${
+                      activeTab === "FIR" && idx === 1
+                        ? "bg-white/10 text-cyan-400 border border-white/10 shadow-sm"
+                        : "text-slate-400 hover:text-slate-200"
+                    }`}
+                  >
+                    {tabLabel}
+                  </button>
+                ))}
+              </div>
+              {renderComplaintsTable("FIR")}
+            </div>
           ) : activeTab === "CSR" ? (
-            renderComplaintsTable("CSR")
+            <div className="space-y-6">
+              <div className="flex gap-2 p-1 bg-slate-950/20 border border-white/5 rounded-xl max-w-sm">
+                {["All Cases", "FIR Only", "CSR Only"].map((tabLabel, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => {
+                      if (idx === 0) setActiveTab("Cases");
+                      else if (idx === 1) setActiveTab("FIR");
+                      else setActiveTab("CSR");
+                    }}
+                    className={`flex-1 py-1.5 text-[11px] font-bold uppercase rounded-lg transition-all cursor-pointer ${
+                      activeTab === "CSR" && idx === 2
+                        ? "bg-white/10 text-cyan-400 border border-white/10 shadow-sm"
+                        : "text-slate-400 hover:text-slate-200"
+                    }`}
+                  >
+                    {tabLabel}
+                  </button>
+                ))}
+              </div>
+              {renderComplaintsTable("CSR")}
+            </div>
+          ) : activeTab === "Reports" ? (
+            <div className="space-y-4">
+              <div className="p-4 bg-slate-900/40 border border-white/5 rounded-2xl flex items-center justify-between">
+                <div>
+                  <h4 className="text-sm font-bold text-slate-200">Precinct Record Registry Export</h4>
+                  <p className="text-xs text-slate-400 mt-1">Download CSV logs or print lists of registered systems users.</p>
+                </div>
+              </div>
+              {renderUsersTable()}
+            </div>
+          ) : activeTab === "SOS" ? (
+            renderSOSAlertsSection()
           ) : null}
         </div>
       </main>
@@ -3600,6 +4183,37 @@ export default function AdminDashboard() {
         </div>
       )}
 
+      {/* BOTTOM NAVIGATION DOCK */}
+      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] w-[95%] md:w-auto max-w-6xl px-4 md:px-8 py-4 md:py-5 bg-[#1a0505]/95 backdrop-blur-xl border border-red-900/50 rounded-3xl shadow-[0_10px_40px_rgba(220,38,38,0.25)] flex items-center justify-center gap-4 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+        <div className="flex items-center gap-3 md:gap-5">
+          {[
+            { id: "Dashboard", label: "Dashboard", icon: LayoutDashboard },
+            { id: "SOS", label: "SOS Alerts", icon: ShieldAlert, badge: sosAlertsData.filter((a: any) => a.status === "Active").length, badgeColor: "bg-red-500 text-white shadow-[0_0_12px_rgba(239,68,68,0.8)]" },
+            { id: "Officers", label: "Officers", icon: Shield, badge: policeOfficers.length, badgeColor: "bg-cyan-500 text-white shadow-[0_0_12px_rgba(6,182,212,0.8)]" },
+            { id: "Police Stations", label: "Stations", icon: Building2 },
+            { id: "Cases", label: "Cases", icon: FileText, badge: stats.totalComplaints, badgeColor: "bg-amber-500 text-white shadow-[0_0_12px_rgba(245,158,11,0.8)]" },
+            { id: "Reports", label: "Reports", icon: FileSpreadsheet },
+          ].map((item) => (
+            <button 
+              key={item.id} 
+              onClick={() => setActiveTab(item.id)}
+              className={`flex flex-col md:flex-row items-center justify-center gap-2 md:gap-3 px-5 py-3 md:px-6 md:py-4 rounded-2xl font-medium transition-all cursor-pointer relative shrink-0 ${
+                activeTab === item.id 
+                  ? "bg-red-500/20 text-red-400 shadow-[inset_0_0_25px_rgba(239,68,68,0.3)] border border-red-500/40" 
+                  : "text-red-300/60 hover:text-red-100 hover:bg-red-500/10 border border-transparent"
+              }`}
+            >
+              <item.icon className={`w-7 h-7 md:w-6 md:h-6 ${activeTab === item.id ? "text-red-400" : ""}`} />
+              <span className={`text-sm md:text-base tracking-wide ${activeTab === item.id ? "font-bold" : ""}`}>{item.label}</span>
+              {item.badge !== undefined && item.badge > 0 && (
+                <span className={`absolute -top-1.5 -right-1.5 md:top-auto md:right-auto md:relative md:-top-1 md:ml-1.5 px-2.5 py-1 rounded-full text-[10px] font-mono font-bold leading-none ${item.badgeColor}`}>
+                  {item.badge}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+      </div>
     </motion.div>
   );
 }

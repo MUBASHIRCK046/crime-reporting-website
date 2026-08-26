@@ -7,7 +7,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 export function ThemeToggle() {
-  const { theme, setTheme } = useTheme();
+  const { resolvedTheme, setTheme } = useTheme();
   const [mounted, setMounted] = React.useState(false);
   const pathname = usePathname();
 
@@ -15,17 +15,19 @@ export function ThemeToggle() {
     setMounted(true);
   }, []);
 
+  // Hide the home button if we are already on the home page
+  const isHome = pathname === "/";
+
   if (!mounted) {
     return null;
   }
 
-  // Hide the home button if we are already on the home page
-  const isHome = pathname === "/";
+  const isDark = resolvedTheme === "dark";
 
   return (
     <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3">
       {!isHome && (
-        <Link 
+        <Link
           href="/"
           className="p-4 rounded-full glass-panel glass-panel-hover text-text-primary shadow-xl hover:scale-110 transition-all flex items-center justify-center group"
           aria-label="Go to home page"
@@ -33,13 +35,13 @@ export function ThemeToggle() {
           <Home className="w-6 h-6 group-hover:-translate-y-1 transition-transform duration-300 text-blue-500" />
         </Link>
       )}
-      
+
       <button
-        onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+        onClick={() => setTheme(isDark ? "light" : "dark")}
         className="p-4 rounded-full glass-panel glass-panel-hover text-text-primary shadow-xl hover:scale-110 transition-transform flex items-center justify-center group"
         aria-label="Toggle theme"
       >
-        {theme === "dark" ? (
+        {isDark ? (
           <Sun className="w-6 h-6 text-yellow-400 group-hover:rotate-45 transition-transform duration-300" />
         ) : (
           <Moon className="w-6 h-6 text-purple-500 group-hover:-rotate-12 transition-transform duration-300" />
@@ -48,3 +50,4 @@ export function ThemeToggle() {
     </div>
   );
 }
+

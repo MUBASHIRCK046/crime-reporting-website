@@ -114,21 +114,38 @@ export default function CitizenDashboard() {
   }, [router]);
 
   const handleSOS = async () => {
-    if (!userUid) return;
+    if (!userUid || sosLoading || sosActive) return;
     
     if (navigator.geolocation) {
       setSosLoading(true);
       navigator.geolocation.getCurrentPosition(
         async (position) => {
-          await triggerSOS(userUid, position.coords.latitude, position.coords.longitude);
-          setSosLoading(false);
-          setSosActive(true);
-          setTimeout(() => setSosActive(false), 5000);
+          try {
+            const result = await triggerSOS(userUid, position.coords.latitude, position.coords.longitude);
+            if (result.success) {
+              setSosActive(true);
+              toast.success("Emergency SOS triggered! Nearby police units have been notified.");
+              setTimeout(() => setSosActive(false), 5000);
+            } else {
+              toast.error("Unable to send SOS alert: " + (result.error || "Please try again."));
+            }
+          } catch (err: any) {
+            console.error("SOS trigger error:", err);
+            toast.error("Unable to send SOS alert. Please try again.");
+          } finally {
+            setSosLoading(false);
+          }
         },
         (error) => {
-          toast.error("Could not get your location! Please enable GPS.");
+          console.error("SOS geolocation error:", error);
+          if (error.code === error.PERMISSION_DENIED) {
+            toast.error("Unable to access your location. Please enable location permission to send an SOS alert.");
+          } else {
+            toast.error("GPS location is unavailable or timed out. Please try again.");
+          }
           setSosLoading(false);
-        }
+        },
+        { enableHighAccuracy: true, timeout: 10000 }
       );
     } else {
       toast.error("Your browser does not support GPS location.");
@@ -301,10 +318,10 @@ export default function CitizenDashboard() {
                   
                   <button 
                     onClick={handleSOS}
-                    disabled={sosLoading}
+                    disabled={sosLoading || sosActive}
                     className={`w-full max-w-xs py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
                       sosActive 
-                        ? "bg-emerald-500/80 text-white backdrop-blur-md shadow-lg border border-emerald-400/50" 
+                        ? "bg-emerald-500/80 text-white backdrop-blur-md shadow-lg border border-emerald-400/50 cursor-default" 
                         : "bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white shadow-lg shadow-red-600/30 disabled:opacity-50 border border-red-500/50"
                     }`}
                   >

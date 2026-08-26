@@ -7,7 +7,7 @@
  */
 
 import { db, storage } from "@/firebase/client";
-import { collection, addDoc, getDocs, query, where } from "firebase/firestore";
+import { collection, addDoc, getDocs, query, where, doc, getDoc } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 /**
@@ -61,11 +61,39 @@ export async function fileComplaint(citizenId: string, title: string, descriptio
  */
 export async function triggerSOS(citizenId: string, latitude: number, longitude: number) {
   try {
+    // Retrieve the citizen's profile info from /users/{citizenId}
+    const userDocRef = doc(db, "users", citizenId);
+    const userDoc = await getDoc(userDocRef);
+    let citizenName = "Unknown Citizen";
+    let citizenPhone = "N/A";
+    let citizenEmail = "N/A";
+    let citizenAddress = "N/A";
+
+    if (userDoc.exists()) {
+      const data = userDoc.data();
+      citizenName = data.name || "Unknown Citizen";
+      citizenPhone = data.mobileNumber || data.phone || "N/A";
+      citizenEmail = data.email || "N/A";
+      citizenAddress = data.residentialAddress || data.address || "N/A";
+    }
+
     const docRef = await addDoc(collection(db, "sos_alerts"), {
       citizenId: citizenId,
-      location: { latitude, longitude }, // Real GPS coordinates
+      citizenName: citizenName,
+      citizenPhone: citizenPhone,
+      citizenEmail: citizenEmail,
+      citizenAddress: citizenAddress,
+      latitude: latitude,
+      longitude: longitude,
+      location: { latitude, longitude }, // Keep for compatibility
+      emergencyMessage: "Citizen has activated the Emergency SOS.",
       status: "Active",
-      timestamp: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
+      timestamp: new Date().toISOString(), // Keep for compatibility
+      acknowledgedAt: null,
+      respondingAt: null,
+      resolvedAt: null,
+      responseInfo: ""
     });
     return { success: true, id: docRef.id, error: null };
   } catch (error: any) {

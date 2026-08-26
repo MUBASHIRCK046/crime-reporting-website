@@ -86,8 +86,23 @@ function MapClickHandler({ onClick }: { onClick: () => void }) {
   return null;
 }
 
-export function SafetyMap() {
-  const mapRef = useRef<L.Map | null>(null);
+interface SafetyMapProps {
+  externalMapRef?: React.MutableRefObject<L.Map | null>;
+  sosAlerts?: any[];
+  selectedAlertId?: string | null;
+  onAlertMarkerClick?: (alert: any) => void;
+  hideDetails?: boolean;
+}
+
+export function SafetyMap({
+  externalMapRef,
+  sosAlerts = [],
+  selectedAlertId = null,
+  onAlertMarkerClick,
+  hideDetails = false
+}: SafetyMapProps = {}) {
+  const internalMapRef = useRef<L.Map | null>(null);
+  const mapRef = externalMapRef || internalMapRef;
 
   const defaultCenter: [number, number] = [11.3204, 75.9922];
   const defaultZoom = 14;
@@ -403,11 +418,21 @@ export function SafetyMap() {
     );
   };
 
+  // Center on selected SOS alert when it changes
+  useEffect(() => {
+    if (selectedAlertId && sosAlerts.length > 0) {
+      const selected = sosAlerts.find(a => a.id === selectedAlertId);
+      if (selected && selected.latitude && selected.longitude && mapRef.current) {
+        mapRef.current.flyTo([selected.latitude, selected.longitude], 16, { duration: 1.5 });
+      }
+    }
+  }, [selectedAlertId, sosAlerts, mapRef]);
+
   return (
     <div className="w-full h-full flex flex-col lg:flex-row gap-4 p-1">
       
       {/* Left Pane - Leaflet Map Box */}
-      <div className="relative flex-1 lg:flex-[2] h-[260px] lg:h-full rounded-xl overflow-hidden border border-slate-800 shadow-lg">
+      <div className={`relative h-[260px] lg:h-full rounded-xl overflow-hidden border border-slate-800 shadow-lg ${hideDetails ? 'flex-1 w-full' : 'flex-1 lg:flex-[2]'}`}>
         {/* Alert Overlay */}
         {alertMessage && (
           <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] bg-slate-950/95 border border-rose-500/50 rounded-xl px-4 py-2.5 shadow-2xl text-xs text-rose-200 backdrop-blur-md animate-fade-in text-center max-w-[90%] md:max-w-md">
@@ -602,11 +627,63 @@ export function SafetyMap() {
               </Popup>
             </Marker>
           ))}
+
+          {/* Active/All SOS Markers */}
+          {sosAlerts.map((alert) => {
+            const isSelected = alert.id === selectedAlertId;
+            const sosIcon = typeof window !== "undefined" ? L.divIcon({
+              className: "custom-sos-marker-icon",
+              html: `<div class="relative flex items-center justify-center ${isSelected ? 'w-10 h-10' : 'w-8 h-8'}">
+                       <div class="absolute w-full h-full bg-red-500 rounded-full opacity-40 animate-ping"></div>
+                       <div class="relative ${isSelected ? 'w-6 h-6' : 'w-5 h-5'} bg-red-650 rounded-full border-2 border-white shadow-lg flex items-center justify-center text-[10px]">
+                         🔴
+                       </div>
+                     </div>`,
+              iconSize: isSelected ? [40, 40] : [32, 32],
+              iconAnchor: isSelected ? [20, 20] : [16, 16],
+            }) : null;
+
+            return alert.latitude && alert.longitude && sosIcon ? (
+              <Marker
+                key={alert.id}
+                position={[alert.latitude, alert.longitude]}
+                icon={sosIcon}
+                eventHandlers={{
+                  click: () => {
+                    if (onAlertMarkerClick) {
+                      onAlertMarkerClick(alert);
+                    }
+                  },
+                }}
+              >
+                <Popup>
+                  <div style={{ color: "#0f172a", padding: "6px", fontFamily: "system-ui, -apple-system, sans-serif", minWidth: "180px" }}>
+                    <h4 style={{ margin: "0 0 4px 0", fontWeight: 700, fontSize: "14px", color: "#e11d48" }}>🚨 EMERGENCY SOS</h4>
+                    <p style={{ margin: "4px 0 2px 0", fontSize: "12px", fontWeight: 600 }}>Citizen: {alert.citizenName || "Unknown"}</p>
+                    <p style={{ margin: "0", fontSize: "11px", color: "#64748b" }}>Phone: {alert.citizenPhone || "N/A"}</p>
+                    <p style={{ margin: "0", fontSize: "11px", color: "#64748b" }}>Status: {alert.status}</p>
+                    <p style={{ margin: "0", fontSize: "11px", color: "#64748b" }}>Time: {new Date(alert.createdAt || alert.timestamp).toLocaleTimeString()}</p>
+                    <div style={{ marginTop: "8px", borderTop: "1px solid #e2e8f0", paddingTop: "6px" }}>
+                      <a
+                        href={`https://www.google.com/maps/dir/?api=1&destination=${alert.latitude},${alert.longitude}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{ fontSize: "11px", fontWeight: 600, color: "#2563eb", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "4px" }}
+                      >
+                        Open in Google Maps {"→"}
+                      </a>
+                    </div>
+                  </div>
+                </Popup>
+              </Marker>
+            ) : null;
+          })}
         </MapContainer>
       </div>
 
       {/* Right Pane - Details Column Box */}
-      <div className="flex-1 lg:flex-[1] h-[210px] lg:h-full overflow-y-auto bg-slate-950/95 border border-slate-800 rounded-xl shadow-lg scrollbar-thin scrollbar-thumb-slate-800">
+      {!hideDetails && (
+        <div className="flex-1 lg:flex-[1] h-[210px] lg:h-full overflow-y-auto bg-slate-950/95 border border-slate-800 rounded-xl shadow-lg scrollbar-thin scrollbar-thumb-slate-800">
         {selectedStation ? (
           <div className="p-4 space-y-4 text-white font-sans">
             <div>
@@ -722,7 +799,8 @@ export function SafetyMap() {
             </p>
           </div>
         )}
-      </div>
+        </div>
+      )}
 
     </div>
   );

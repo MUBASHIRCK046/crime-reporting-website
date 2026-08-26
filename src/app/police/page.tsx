@@ -47,34 +47,32 @@ export default function PoliceDashboard() {
   const [fetchingKyc, setFetchingKyc] = useState(false);
 
   useEffect(() => {
-    const checkAuthAndFetchData = async () => {
-      auth.onAuthStateChanged(async (user) => {
-        if (!user) {
-          router.push("/login");
-          return;
-        }
+    const unsubscribe = auth.onAuthStateChanged(async (user) => {
+      if (!user) {
+        router.push("/login");
+        return;
+      }
 
-        const userDoc = await getDoc(doc(db, "users", user.uid));
-        if (userDoc.exists()) {
-          const userData = userDoc.data();
-          if (userData.role === "police") {
-            setCurrentUser({ uid: user.uid, ...userData });
-            if (userData.mustChangePassword) {
-              router.push("/police/change-password");
-              return;
-            }
-            fetchDashboardData(user.uid);
-          } else if (userData.role === "admin") {
-            router.push("/admin");
-          } else {
-            router.push("/citizen");
+      const userDoc = await getDoc(doc(db, "users", user.uid));
+      if (userDoc.exists()) {
+        const userData = userDoc.data();
+        if (userData.role === "police") {
+          setCurrentUser({ uid: user.uid, ...userData });
+          if (userData.mustChangePassword) {
+            router.push("/police/change-password");
+            return;
           }
+          fetchDashboardData(user.uid);
+        } else if (userData.role === "admin") {
+          router.push("/admin");
         } else {
-          router.push("/login");
+          router.push("/citizen");
         }
-      });
-    };
-    checkAuthAndFetchData();
+      } else {
+        router.push("/login");
+      }
+    });
+    return () => unsubscribe();
   }, [router]);
 
   // Fetch logs whenever a complaint is selected
