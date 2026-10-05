@@ -559,3 +559,183 @@ export function StatusDonutChart({
     </div>
   );
 }
+
+export function PrecinctCircularStats({
+  totalComplaints,
+  activeSOS,
+  totalOfficers,
+  totalUsers,
+  pendingCases,
+  resolvedCases,
+  onSOSClick,
+  onOfficersClick
+}: {
+  totalComplaints: number;
+  activeSOS: number;
+  totalOfficers: number;
+  totalUsers: number;
+  pendingCases: number;
+  resolvedCases: number;
+  onSOSClick?: () => void;
+  onOfficersClick?: () => void;
+}) {
+  const statsList = [
+    {
+      id: "complaints",
+      label: "Total Complaints",
+      value: totalComplaints,
+      subText: "FIRs & CSRs Registered",
+      color: "#06b6d4",
+      bgGlow: "bg-cyan-500/10",
+      border: "border-cyan-500/25 hover:border-cyan-500/50",
+      glow: "hover:shadow-[0_0_30px_rgba(6,182,212,0.3)]",
+      pct: 100
+    },
+    {
+      id: "sos",
+      label: "Active SOS Cases",
+      value: activeSOS,
+      subText: activeSOS > 0 ? "🚨 Immediate Action Req." : "All Dispatches Clear",
+      color: "#ef4444",
+      bgGlow: "bg-red-500/15",
+      border: "border-red-500/40 hover:border-red-500/70",
+      glow: "shadow-[0_0_25px_rgba(239,68,68,0.25)] hover:shadow-[0_0_35px_rgba(239,68,68,0.5)]",
+      pct: activeSOS > 0 ? Math.min(100, (activeSOS / 10) * 100) : 0,
+      isEmergency: true,
+      onClick: onSOSClick
+    },
+    {
+      id: "officers",
+      label: "Total Police Officers",
+      value: totalOfficers,
+      subText: "Active Precinct Grid",
+      color: "#a855f7",
+      bgGlow: "bg-purple-500/10",
+      border: "border-purple-500/25 hover:border-purple-500/50",
+      glow: "hover:shadow-[0_0_30px_rgba(168,85,247,0.3)]",
+      pct: totalOfficers > 0 ? Math.min(100, (totalOfficers / 20) * 100) : 0,
+      onClick: onOfficersClick
+    },
+    {
+      id: "users",
+      label: "Total Users",
+      value: totalUsers,
+      subText: "Verified Citizen KYC",
+      color: "#6366f1",
+      bgGlow: "bg-indigo-500/10",
+      border: "border-indigo-500/25 hover:border-indigo-500/50",
+      glow: "hover:shadow-[0_0_30px_rgba(99,102,241,0.3)]",
+      pct: 100
+    },
+    {
+      id: "pending",
+      label: "Total Pending Cases",
+      value: pendingCases,
+      subText: totalComplaints > 0 ? `${Math.round((pendingCases / totalComplaints) * 100)}% Under Investigation` : "0% Backlog",
+      color: "#f59e0b",
+      bgGlow: "bg-amber-500/10",
+      border: "border-amber-500/25 hover:border-amber-500/50",
+      glow: "hover:shadow-[0_0_30px_rgba(245,158,11,0.3)]",
+      pct: totalComplaints > 0 ? (pendingCases / totalComplaints) * 100 : 0
+    },
+    {
+      id: "resolved",
+      label: "Resolved Cases",
+      value: resolvedCases,
+      subText: totalComplaints > 0 ? `${Math.round((resolvedCases / totalComplaints) * 100)}% Safe Resolution Rate` : "100% Rate",
+      color: "#10b981",
+      bgGlow: "bg-emerald-500/10",
+      border: "border-emerald-500/25 hover:border-emerald-500/50",
+      glow: "hover:shadow-[0_0_30px_rgba(16,185,129,0.3)]",
+      pct: totalComplaints > 0 ? (resolvedCases / totalComplaints) * 100 : 100
+    }
+  ];
+
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 w-full">
+      {statsList.map((stat, idx) => {
+        const rOuter = 44;
+        const circOuter = 2 * Math.PI * rOuter; // ~276.46
+        const safePct = Math.max(10, Math.min(100, stat.pct));
+        const offsetOuter = circOuter * (1 - safePct / 100);
+
+        return (
+          <motion.div
+            key={stat.id}
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: idx * 0.08 }}
+            whileHover={{ scale: 1.05, y: -3 }}
+            onClick={stat.onClick}
+            className={`p-4 rounded-3xl glass-panel border ${stat.border} ${stat.bgGlow} transition-all duration-300 flex flex-col items-center justify-between text-center relative overflow-hidden shadow-lg ${stat.glow} ${stat.onClick ? "cursor-pointer" : ""}`}
+          >
+            {/* Ambient Refraction Highlight */}
+            <div className="absolute inset-0 bg-gradient-to-tr from-white/0 via-white/5 to-white/10 pointer-events-none rounded-3xl" />
+
+            {/* Circular Ring Progress */}
+            <div className="relative w-28 h-28 flex items-center justify-center my-1">
+              <svg className="w-full h-full transform -rotate-90" viewBox="0 0 110 110">
+                {/* Background Track */}
+                <circle
+                  cx="55"
+                  cy="55"
+                  r={rOuter}
+                  className="stroke-slate-200 dark:stroke-ui-border/30 fill-transparent"
+                  strokeWidth="5.5"
+                />
+                {/* Animated Progress Ring */}
+                <motion.circle
+                  cx="55"
+                  cy="55"
+                  r={rOuter}
+                  stroke={stat.color}
+                  className="fill-transparent"
+                  strokeWidth="5.5"
+                  strokeDasharray={circOuter}
+                  initial={{ strokeDashoffset: circOuter }}
+                  animate={{ strokeDashoffset: offsetOuter }}
+                  transition={{ duration: 1.2, ease: "easeInOut", delay: 0.2 + idx * 0.1 }}
+                  strokeLinecap="round"
+                />
+                {/* Inner Dashed Indicator Ring */}
+                <motion.circle
+                  cx="55"
+                  cy="55"
+                  r={35}
+                  stroke={stat.color}
+                  className="fill-transparent opacity-20"
+                  strokeWidth="1.5"
+                  strokeDasharray="3, 3"
+                  animate={{ rotate: 360 }}
+                  transition={{ repeat: Infinity, duration: 20, ease: "linear" }}
+                  style={{ transformOrigin: "55px 55px" }}
+                />
+              </svg>
+
+              {/* Number Inside Ring */}
+              <div className="absolute inset-0 flex flex-col items-center justify-center select-none">
+                <span className="text-2xl font-black text-text-primary tracking-tight leading-none">
+                  <CountUp to={stat.value} />
+                </span>
+                {stat.isEmergency && stat.value > 0 && (
+                  <span className="w-2 h-2 rounded-full bg-red-500 animate-ping mt-1" />
+                )}
+              </div>
+            </div>
+
+            {/* Label & Supporting Text */}
+            <div className="mt-2 w-full space-y-1">
+              <p className="text-[11px] font-black uppercase tracking-wider text-text-primary truncate" title={stat.label}>
+                {stat.label}
+              </p>
+              <p className="text-[10px] font-bold text-text-tertiary truncate" title={stat.subText}>
+                {stat.subText}
+              </p>
+            </div>
+          </motion.div>
+        );
+      })}
+    </div>
+  );
+}
+

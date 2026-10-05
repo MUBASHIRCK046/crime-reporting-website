@@ -15,7 +15,7 @@ export const dynamic = 'force-dynamic';
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { uid, name, policeId, policeEmail, badgeNumber, password, adminUid } = body;
+    const { uid, name, policeId, policeEmail, badgeNumber, password, adminUid, adminIdToken } = body;
 
     if (!uid || !policeId || !policeEmail || !badgeNumber || !adminUid) {
       return NextResponse.json({ error: "Missing required fields (UID, Police ID, Police Email, Badge Number, or Admin UID)" }, { status: 400 });
@@ -124,84 +124,116 @@ export async function POST(request: Request) {
       }
     } else {
       // ----------------------------------------------------
-      // FALLBACK MODE: Use Client Firebase SDK on the server
+      // FALLBACK MODE: Use Firestore REST API (works in Node.js server without Admin SDK)
+      // The client-side Firestore SDK CANNOT be used in server-side API routes because
+      // it depends on browser-only APIs and will hang indefinitely.
       // ----------------------------------------------------
-      try {
-        const { initializeApp: clientInitializeApp, getApps: clientGetApps, getApp: clientGetApp } = await import("firebase/app");
-        const { getFirestore: clientGetFirestore, doc: clientDoc, updateDoc: clientUpdateDoc, getDoc: clientGetDoc, collection: clientCollection, query: clientQuery, where: clientWhere, getDocs: clientGetDocs } = await import("firebase/firestore");
+      const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
+      const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "crime-assist";
+      const firestoreBase = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents`;
+      const runQueryUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents:runQuery?key=${apiKey}`;
 
-        const clientFirebaseConfig = {
-          apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-          authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-          projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-          storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-          messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-          appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID
-        };
+      if (!apiKey) {
+        return NextResponse.json({ error: "Firebase API key is not configured." }, { status: 500 });
+      }
 
-        const fallbackAppName = "police-creation-fallback";
-        const fallbackApp = !clientGetApps().some(app => app.name === fallbackAppName)
-          ? clientInitializeApp(clientFirebaseConfig, fallbackAppName)
-          : clientGetApp(fallbackAppName);
+      // Build auth header using admin's token for all Firestore REST requests
+      const authHeaders: Record<string, string> = { "Content-Type": "application/json" };
+      if (adminIdToken) authHeaders["Authorization"] = `Bearer ${adminIdToken}`;
+      const getHeaders: Record<string, string> = {};
+      if (adminIdToken) getHeaders["Authorization"] = `Bearer ${adminIdToken}`;
 
-        const fallbackDb = clientGetFirestore(fallbackApp);
- 
-        // Check if credentials already exist for this officer (Idempotence)
-        const docRef = clientDoc(fallbackDb, "users", uid);
-        const officerDoc = await clientGetDoc(docRef);
-        if (officerDoc.exists()) {
-          const officerData = officerDoc.data();
-          if (officerData?.credentialsGenerated || officerData?.policeId) {
-            return NextResponse.json({
-              success: true,
-              message: "Credentials have already been generated for this officer.",
-              alreadyGenerated: true,
-              policeId: officerData.policeId,
-              policeEmail: officerData.policeEmail || `${officerData.policeId}@police.gov`,
-              badgeNumber: officerData.badgeNumber,
-              temporaryPassword: officerData.temporaryPassword || "********"
-            });
+      // Check if credentials already exist for this officer (Idempotence)
+      const getRes = await fetch(`${firestoreBase}/users/${uid}?key=${apiKey}`, { headers: getHeaders });
+      if (getRes.ok) {
+        const docData = await getRes.json();
+        const fields = docData.fields || {};
+        const alreadyGenerated = fields.credentialsGenerated?.booleanValue || fields.policeId?.stringValue;
+        if (alreadyGenerated) {
+          return NextResponse.json({
+            success: true,
+            message: "Credentials have already been generated for this officer.",
+            alreadyGenerated: true,
+            policeId: fields.policeId?.stringValue,
+            policeEmail: fields.policeEmail?.stringValue || `${fields.policeId?.stringValue}@police.gov`,
+            badgeNumber: fields.badgeNumber?.stringValue,
+            temporaryPassword: fields.temporaryPassword?.stringValue || "********"
+          });
+        }
+      }
+
+      // Validate Police ID uniqueness via Firestore REST query
+      const policeIdQuery = await fetch(runQueryUrl, {
+        method: "POST",
+        headers: authHeaders,
+        body: JSON.stringify({
+          structuredQuery: {
+            from: [{ collectionId: "users" }],
+            where: { fieldFilter: { field: { fieldPath: "policeId" }, op: "EQUAL", value: { stringValue: policeId } } },
+            limit: 2
           }
+        })
+      });
+      const policeIdData = await policeIdQuery.json();
+      const duplicatePoliceId = Array.isArray(policeIdData) && policeIdData.find((r: any) => r.document && !r.document.name?.endsWith(`/${uid}`));
+      if (duplicatePoliceId) {
+        const dupName = duplicatePoliceId.document?.fields?.name?.stringValue || "another officer";
+        return NextResponse.json({ error: `The Police ID '${policeId}' is already assigned to ${dupName}.` }, { status: 400 });
+      }
+
+      // Validate Police Email uniqueness via Firestore REST query
+      const policeEmailQuery = await fetch(runQueryUrl, {
+        method: "POST",
+        headers: authHeaders,
+        body: JSON.stringify({
+          structuredQuery: {
+            from: [{ collectionId: "users" }],
+            where: { fieldFilter: { field: { fieldPath: "policeEmail" }, op: "EQUAL", value: { stringValue: policeEmail } } },
+            limit: 2
+          }
+        })
+      });
+      const policeEmailData = await policeEmailQuery.json();
+      const duplicatePoliceEmail = Array.isArray(policeEmailData) && policeEmailData.find((r: any) => r.document && !r.document.name?.endsWith(`/${uid}`));
+      if (duplicatePoliceEmail) {
+        const dupName = duplicatePoliceEmail.document?.fields?.name?.stringValue || "another officer";
+        return NextResponse.json({ error: `The Police Email '${policeEmail}' is already assigned to ${dupName}.` }, { status: 400 });
+      }
+
+      // Build the Firestore fields to update
+      const updateFields: Record<string, any> = {
+        policeId: { stringValue: policeId },
+        policeEmail: { stringValue: policeEmail },
+        badgeNumber: { stringValue: badgeNumber },
+        credentialsGenerated: { booleanValue: true },
+        updatedAt: { stringValue: new Date().toISOString() }
+      };
+      const updateMaskPaths = ["policeId", "policeEmail", "badgeNumber", "credentialsGenerated", "updatedAt"];
+
+      if (name && name.trim() !== "") {
+        updateFields.name = { stringValue: name };
+        updateMaskPaths.push("name");
+      }
+
+      if (password && password.trim() !== "") {
+        updateFields.mustChangePassword = { booleanValue: true };
+        updateFields.temporaryPassword = { stringValue: password };
+        updateMaskPaths.push("mustChangePassword", "temporaryPassword");
+      }
+
+      const maskQuery = updateMaskPaths.map(p => `updateMask.fieldPaths=${encodeURIComponent(p)}`).join("&");
+      const patchRes = await fetch(
+        `${firestoreBase}/users/${uid}?${maskQuery}&key=${apiKey}`,
+        {
+          method: "PATCH",
+          headers: authHeaders,
+          body: JSON.stringify({ fields: updateFields })
         }
+      );
 
-        // Validate Police ID uniqueness
-        const qPoliceId = clientQuery(clientCollection(fallbackDb, "users"), clientWhere("policeId", "==", policeId));
-        const policeIdSnap = await clientGetDocs(qPoliceId);
-        const duplicate = policeIdSnap.docs.find((doc: any) => doc.id !== uid);
-        if (duplicate) {
-          return NextResponse.json({ error: `The Police ID '${policeId}' is already assigned to another officer (${duplicate.data().name}).` }, { status: 400 });
-        }
-
-        // Validate Police Email uniqueness
-        const qPoliceEmail = clientQuery(clientCollection(fallbackDb, "users"), clientWhere("policeEmail", "==", policeEmail));
-        const policeEmailSnap = await clientGetDocs(qPoliceEmail);
-        const duplicateEmail = policeEmailSnap.docs.find((doc: any) => doc.id !== uid);
-        if (duplicateEmail) {
-          return NextResponse.json({ error: `The Police Email '${policeEmail}' is already assigned to another officer (${duplicateEmail.data().name}).` }, { status: 400 });
-        }
-
-        // Update Firestore Profile
-        const updateData: any = {
-          policeId,
-          policeEmail,
-          badgeNumber,
-          credentialsGenerated: true,
-          updatedAt: new Date().toISOString()
-        };
-
-        if (name && name.trim() !== "") {
-          updateData.name = name;
-        }
-
-        if (password && password.trim() !== "") {
-          updateData.mustChangePassword = true;
-          updateData.temporaryPassword = password;
-        }
-
-        await clientUpdateDoc(clientDoc(fallbackDb, "users", uid), updateData);
-      } catch (dbErr: any) {
-        console.warn("Fallback client update error:", dbErr);
-        return NextResponse.json({ error: `Failed to update database record: ${dbErr.message}` }, { status: 500 });
+      if (!patchRes.ok) {
+        const patchErr = await patchRes.json();
+        return NextResponse.json({ error: `Failed to update database record: ${patchErr?.error?.message || "Unknown error"}` }, { status: 500 });
       }
     }
 

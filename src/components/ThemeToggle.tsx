@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { Moon, Sun, Home } from "lucide-react";
-import { useTheme } from "next-themes";
+import { useTheme } from "@/components/ThemeProvider";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 

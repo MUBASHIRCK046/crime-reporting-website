@@ -29,7 +29,7 @@ function generateSecureTemporaryPassword(length: number = 12): string {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { uid, adminUid } = body;
+    const { uid, adminUid, adminIdToken } = body;
 
     if (!uid || !adminUid) {
       return NextResponse.json({ error: "Missing required fields (UID or Admin UID)" }, { status: 400 });
@@ -76,44 +76,56 @@ export async function POST(request: Request) {
       });
     } else {
       // ----------------------------------------------------
-      // FALLBACK MODE: Use Client Firebase SDK on the server
+      // FALLBACK MODE: Use Firestore REST API (works in Node.js server without Admin SDK)
+      // The client-side Firestore SDK CANNOT be used in server-side API routes because
+      // it depends on browser-only APIs and will hang indefinitely.
+      // NOTE: Without Admin SDK, we can only store the password in Firestore (not reset Firebase Auth).
       // ----------------------------------------------------
-      try {
-        const { initializeApp: clientInitializeApp, getApps: clientGetApps, getApp: clientGetApp } = await import("firebase/app");
-        const { getFirestore: clientGetFirestore, doc: clientDoc, getDoc: clientGetDoc, updateDoc: clientUpdateDoc } = await import("firebase/firestore");
+      const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
+      const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "crime-assist";
+      const firestoreBase = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents`;
 
-        const clientFirebaseConfig = {
-          apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-          authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-          projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-          storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-          messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-          appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID
-        };
+      if (!apiKey) {
+        return NextResponse.json({ error: "Firebase API key is not configured." }, { status: 500 });
+      }
 
-        const fallbackAppName = "police-creation-fallback";
-        const fallbackApp = !clientGetApps().some(app => app.name === fallbackAppName)
-          ? clientInitializeApp(clientFirebaseConfig, fallbackAppName)
-          : clientGetApp(fallbackAppName);
+      // Get current officer data from Firestore REST API
+      const getHeaders: Record<string, string> = {};
+      if (adminIdToken) getHeaders["Authorization"] = `Bearer ${adminIdToken}`;
 
-        const fallbackDb = clientGetFirestore(fallbackApp);
+      const getRes = await fetch(`${firestoreBase}/users/${uid}?key=${apiKey}`, { headers: getHeaders });
+      if (getRes.ok) {
+        const docData = await getRes.json();
+        const fields = docData.fields || {};
+        policeId = fields.policeId?.stringValue || fields.badgeNumber?.stringValue || `POL-${uid.slice(-4)}`;
+        officerName = fields.name?.stringValue || "Police Officer";
+      }
 
-        // Get current officer data from Firestore
-        const userDoc = await clientGetDoc(clientDoc(fallbackDb, "users", uid));
-        if (userDoc.exists()) {
-          const data = userDoc.data();
-          policeId = data?.policeId || data?.badgeNumber || `POL-${uid.slice(-4)}`;
-          officerName = data?.name || "Police Officer";
+      // Update Firestore via REST API (PATCH only the changed fields)
+      // The Firestore rule `allow update: if isPoliceOrAdmin()` allows the admin to update any user doc.
+      const patchBody = {
+        fields: {
+          mustChangePassword: { booleanValue: true },
+          temporaryPassword: { stringValue: newTemporaryPassword },
+          updatedAt: { stringValue: new Date().toISOString() }
         }
+      };
 
-        await clientUpdateDoc(clientDoc(fallbackDb, "users", uid), {
-          mustChangePassword: true,
-          temporaryPassword: newTemporaryPassword,
-          updatedAt: new Date().toISOString()
-        });
-      } catch (fallbackErr: any) {
-        console.warn("Fallback reset password warning:", fallbackErr);
-        return NextResponse.json({ error: `Failed to reset password: ${fallbackErr.message}` }, { status: 500 });
+      const patchHeaders: Record<string, string> = { "Content-Type": "application/json" };
+      if (adminIdToken) patchHeaders["Authorization"] = `Bearer ${adminIdToken}`;
+
+      const patchRes = await fetch(
+        `${firestoreBase}/users/${uid}?updateMask.fieldPaths=mustChangePassword&updateMask.fieldPaths=temporaryPassword&updateMask.fieldPaths=updatedAt&key=${apiKey}`,
+        {
+          method: "PATCH",
+          headers: patchHeaders,
+          body: JSON.stringify(patchBody)
+        }
+      );
+
+      if (!patchRes.ok) {
+        const patchErr = await patchRes.json();
+        return NextResponse.json({ error: `Failed to update officer record: ${patchErr?.error?.message || "Unknown error"}` }, { status: 500 });
       }
     }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { loginUser } from "@/lib/auth";
@@ -16,6 +16,13 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "warning" } | null>(null);
   const [loading, setLoading] = useState(false);
+
+  // Pre-warm / prefetch dashboard routes on mount for instant zero-delay navigation
+  useEffect(() => {
+    router.prefetch("/citizen");
+    router.prefetch("/admin");
+    router.prefetch("/police");
+  }, [router]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -66,7 +73,6 @@ export default function LoginPage() {
       ) {
         userFriendlyError = "Incorrect email or password. Please try again.";
       } else {
-        // Fallback for other errors (network, custom messages) but still mask raw technical codes
         userFriendlyError = result.error.includes("auth/")
           ? "Incorrect email or password. Please try again."
           : result.error;
@@ -75,14 +81,10 @@ export default function LoginPage() {
       setToast({ message: userFriendlyError, type: "error" });
       setLoading(false);
     } else {
-      setToast({ message: "Success! Signing you in...", type: "success" });
-      
-      // Delay redirect slightly so user can view the success toast message
-      setTimeout(() => {
-        if (result.role === "admin") router.push("/admin");
-        else if (result.role === "police") router.push("/police");
-        else router.push("/citizen"); 
-      }, 1500);
+      // Instant redirect for maximum performance
+      const destination =
+        result.role === "admin" ? "/admin" : result.role === "police" ? "/police" : "/citizen";
+      router.push(destination);
     }
   };
 
@@ -220,16 +222,29 @@ export default function LoginPage() {
 
             {/* Button */}
             <motion.div variants={itemVariants}>
-              <motion.button
-                whileHover={!loading ? { scale: 1.015, translateY: -1 } : {}}
-                whileTap={!loading ? { scale: 0.985 } : {}}
-                transition={{ duration: 0.2 }}
+              <button
                 type="submit"
                 disabled={loading}
-                className="w-full mt-4 glass-button py-3 px-4 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                className="animated-button w-full mt-4 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Sign In"}
-              </motion.button>
+                <svg className="arr-2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                  <path d="M16.1716 10.9999L10.8076 5.63589L12.2218 4.22168L20 11.9999L12.2218 19.7781L10.8076 18.3639L16.1716 12.9999H4V10.9999H16.1716Z" />
+                </svg>
+                <span className="text flex items-center justify-center gap-2">
+                  {loading ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      Signing In...
+                    </>
+                  ) : (
+                    "Sign In"
+                  )}
+                </span>
+                <span className="circle"></span>
+                <svg className="arr-1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                  <path d="M16.1716 10.9999L10.8076 5.63589L12.2218 4.22168L20 11.9999L12.2218 19.7781L10.8076 18.3639L16.1716 12.9999H4V10.9999H16.1716Z" />
+                </svg>
+              </button>
             </motion.div>
 
             {/* Link to Register */}

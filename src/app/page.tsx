@@ -17,31 +17,18 @@ import {
   MapPin,
   Clock,
   Compass,
-  AlertOctagon,
-  Eye,
   FileEdit,
   FolderLock,
   Download,
-  Activity,
   Map,
   X,
-  FileCheck,
-  Bell,
   Globe,
-  Award,
-  TrendingUp,
-  Cpu,
-  Navigation,
-  Languages,
-  BookOpen,
-  Rss,
-  Play,
-  UserCheck,
   AlertCircle,
   Building2,
   Mail
 } from "lucide-react";
 import { toast } from "sonner";
+import { TacticalFooter } from "@/components/TacticalFooter";
 
 // ==============================================================================
 // 1. DICTIONARY TRANSLATIONS FOR ENGLISH, MALAYALAM, HINDI
@@ -442,65 +429,7 @@ export default function LandingPage() {
     return translations[selectedLanguage]?.[key] || translations["English"]?.[key] || key;
   };
 
-  // Cyber console terminal check logs
-  const [cyberCodeLog, setCyberCodeLog] = useState<string[]>([]);
-  useEffect(() => {
-    const initialLogs = [
-      "> SYSTEM SCAN INITIATED",
-      "> NETWORK FILTER APPLIED",
-      "> SECURITY CHECK COMPLETE",
-      "> THREATS DETECTED: 0",
-      "> SYSTEM PROTECTED"
-    ];
-    setCyberCodeLog(initialLogs);
-    const interval = setInterval(() => {
-      const logs = [
-        "> SYSTEM SCAN RUNNING...",
-        "> FIREWALL STATUS: ENABLED",
-        "> THREAT MONITOR: ACTIVE",
-        "> SECURITY LEVEL: MAXIMUM",
-        "> PORT CHECK COMPLETE: SECURE"
-      ];
-      setCyberCodeLog(prev => [...prev.slice(1), logs[Math.floor(Math.random() * logs.length)]]);
-    }, 4500);
-    return () => clearInterval(interval);
-  }, []);
 
-  // Live Vehicle Routing Simulation
-  const [vehicleX, setVehicleX] = useState(15);
-  const [vehicleY, setVehicleY] = useState(65);
-  const [vehicleEta, setVehicleEta] = useState(145);
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setVehicleX(prev => (prev >= 85 ? 15 : prev + 1.2));
-      setVehicleY(prev => (prev <= 25 ? 65 : prev - 0.7));
-      setVehicleEta(prev => (prev <= 10 ? 145 : prev - 2));
-    }, 1000);
-    return () => clearInterval(interval);
-  }, []);
-
-  // Citizen Privacy Protocol masking state simulator
-  const [maskedCitizenId, setMaskedCitizenId] = useState("ASW_05_******");
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const randomStr = Array.from({ length: 5 }, () => Math.floor(Math.random() * 10)).join("");
-      setMaskedCitizenId(`CIT_SECURE_${randomStr}`);
-    }, 5000);
-    return () => clearInterval(interval);
-  }, []);
-
-  // Live Responder Tracker simulator states
-  const [patrolCoords, setPatrolCoords] = useState("11.2594° N, 75.7830° E");
-  const [patrolStatus, setPatrolStatus] = useState("PATROLLING");
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const yOffset = (Math.random() * 0.0020 - 0.0010).toFixed(4);
-      const xOffset = (Math.random() * 0.0020 - 0.0010).toFixed(4);
-      setPatrolCoords(`${(11.2594 + parseFloat(yOffset)).toFixed(4)}° N, ${(75.7830 + parseFloat(xOffset)).toFixed(4)}° E`);
-      setPatrolStatus(Math.random() > 0.7 ? "DISPATCHING" : "PATROLLING");
-    }, 3000);
-    return () => clearInterval(interval);
-  }, []);
 
   // Select mock file
   const handleMockFileUpload = () => {
@@ -615,36 +544,10 @@ export default function LandingPage() {
     }, 2000);
   };
 
-  const renderStatusPulse = (translationKey: string, glowColor: "emerald" | "blue" = "blue") => {
-    const text = t(translationKey);
-    const parts = text.split(":");
-    if (parts.length === 2) {
-      const label = parts[0];
-      const val = parts[1];
-      const glowClass = glowColor === "emerald" 
-        ? "text-emerald-600 dark:text-emerald-400 drop-shadow-[0_0_8px_rgba(16,185,129,0.5)] animate-pulse font-extrabold" 
-        : "text-blue-600 dark:text-blue-400 drop-shadow-[0_0_8px_rgba(59,130,246,0.5)] animate-pulse font-extrabold";
-      return (
-        <span className="inline-flex items-center gap-1 font-mono">
-          <span className="opacity-90">{label}:</span>
-          <span className={glowClass}>{val}</span>
-        </span>
-      );
-    }
-    return <span>{text}</span>;
-  };
 
-  const renderSplitText = (translationKey: string, index: number, fallback: string = "") => {
-    const text = t(translationKey);
-    const parts = text.split(":");
-    if (parts.length >= 2) {
-      return parts[index].trim();
-    }
-    return index === 0 ? text : fallback;
-  };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-[#020617] text-slate-900 dark:text-slate-100 selection:bg-blue-500/30 overflow-hidden relative font-sans bg-security-grid transition-colors duration-300 animate-siren-glow">
+    <div className="min-h-screen bg-slate-50 dark:bg-[#020617] text-slate-900 dark:text-slate-100 selection:bg-blue-500/30 overflow-hidden relative font-sans bg-security-grid transition-colors duration-300">
       
       {/* Background blobs with responsive blur */}
       <div className="absolute inset-0 z-0 pointer-events-none">
@@ -686,8 +589,8 @@ export default function LandingPage() {
           </div>
 
           <div className="flex items-center gap-4">
-            {/* Language Selector */}
-            <div className="bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-3 py-2 flex items-center gap-2 text-xs font-bold transition-all">
+            {/* Language Selector (Preserved in code, hidden from UI) */}
+            <div style={{ display: "none" }} className="bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-3 py-2 flex items-center gap-2 text-xs font-bold transition-all">
               <Globe className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 animate-spin" style={{ animationDuration: "12s" }} />
               <div className="flex gap-1.5">
                 {languagesList.map(lang => (
@@ -839,337 +742,6 @@ export default function LandingPage() {
         </div>
 
       </header>
-
-      {/* ==============================================================================
-      TACTICAL CONTROL ENVIRONMENT (Interactive Radar & Patrol Networks)
-      ============================================================================== */}
-      <section className="relative z-10 max-w-7xl mx-auto px-6 py-10">
-        
-        {/* Glowing HUD Border Deck Container */}
-        <div className="w-full bg-white/70 dark:bg-slate-950/40 border border-slate-200 dark:border-white/5 rounded-[2.5rem] p-6 lg:p-10 shadow-xl dark:shadow-[0_0_50px_rgba(0,0,0,0.4)] backdrop-blur-md relative overflow-hidden flex flex-col gap-10">
-          
-          {/* Deck background grids */}
-          <div className="absolute inset-0 bg-security-grid pointer-events-none opacity-20" />
-          <div className="absolute -top-32 -left-32 w-64 h-64 bg-blue-500/10 dark:bg-blue-500/5 rounded-full blur-[90px] pointer-events-none" />
-
-          {/* Top Panel Cockpit Status: COMMAND RESPONSE CENTER */}
-          <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between border-b border-slate-200 dark:border-white/5 pb-6 gap-4 z-10">
-            <div>
-              <span className="text-[10px] font-black text-blue-600 dark:text-blue-400 tracking-widest uppercase">{t("cmdCenterSubtitle")}</span>
-              <h3 className="text-xl font-extrabold text-slate-900 dark:text-white tracking-tight mt-1">{t("cmdCenterTitle")}</h3>
-            </div>
-
-            {/* Cinematic Command Response Center Tags */}
-            <div className="flex flex-wrap items-center gap-6 text-[10px] font-bold font-mono text-slate-500">
-              <div>
-                <span>{t("sysOnlineTag")}</span>
-              </div>
-              <div>
-                <span>{t("actUnitsTag")}</span>
-              </div>
-              <div>
-                <span>{t("cmdNetTag")}</span>
-              </div>
-              <div>
-                <span>{t("secTag")}</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex flex-col xl:flex-row gap-8 items-stretch z-10">
-            
-            {/* LEFT: Concentric Interactive Radar Scope (RESPONSE LOCATION TRACKING) */}
-            <div className="flex-1 flex flex-col items-center justify-center relative min-h-[380px] border border-slate-200 dark:border-white/5 rounded-3xl p-6 bg-slate-50/50 dark:bg-slate-950/20 backdrop-blur-xl">
-              
-              <div className="absolute top-4 left-4 flex items-center gap-2">
-                <Compass className="w-4 h-4 text-blue-600 dark:text-blue-400 animate-spin" style={{ animationDuration: "12s" }} />
-                <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 tracking-widest uppercase">{t("radarScopeSubtitle")}</span>
-              </div>
-
-              {/* Central Concentric Radar circles */}
-              <div className="relative w-80 h-80 rounded-full border border-slate-200 dark:border-white/10 flex items-center justify-center">
-                <div className="absolute inset-8 rounded-full border border-slate-200 dark:border-white/10" />
-                <div className="absolute inset-16 rounded-full border border-slate-200 dark:border-white/10" />
-                <div className="absolute inset-24 rounded-full border border-slate-200 dark:border-white/10" />
-                
-                {/* Rotating scanner vector line */}
-                <div className="radar-sweep-line" />
-
-                {/* Radar target coordinate blips */}
-                {radarPoints.map((blip) => {
-                  const isDistress = blip.type === "distress";
-                  return (
-                    <button
-                      key={blip.id}
-                      onClick={() => setSelectedRadarBlip(blip)}
-                      style={{ left: `${blip.x}%`, top: `${blip.y}%` }}
-                      className="absolute transform -translate-x-1/2 -translate-y-1/2 cursor-pointer z-20 outline-none border-none bg-transparent group"
-                    >
-                      <span className="relative flex h-4 w-4 items-center justify-center">
-                        <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
-                          isDistress ? "bg-red-400" : "bg-blue-400"
-                        }`}></span>
-                        <span className={`relative inline-flex rounded-full h-2.5 w-2.5 shadow-[0_0_10px_rgba(239,68,68,0.5)] ${
-                          isDistress ? "bg-red-500" : "bg-blue-500"
-                        }`}></span>
-                      </span>
-
-                      {/* Tooltip on hover */}
-                      <span className="absolute left-6 top-1/2 -translate-y-1/2 bg-slate-900/90 text-white text-[9px] font-bold px-2 py-1 rounded border border-white/10 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-30 font-mono">
-                        {blip.label} ({blip.details.unit})
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-
-              <div className="mt-6 text-center">
-                <h4 className="text-xs font-extrabold text-slate-900 dark:text-white uppercase tracking-wider">{t("radarScopeLabel")}</h4>
-                <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium mt-1">
-                  {t("radarSweepLabel")}
-                </p>
-              </div>
-            </div>
-
-            {/* RIGHT: Live Patrol Operations Map Tracker */}
-            <div className="flex-1 flex flex-col border border-slate-200 dark:border-white/5 rounded-3xl p-6 bg-slate-50/50 dark:bg-slate-950/20 backdrop-blur-xl justify-between relative min-h-[380px] overflow-hidden">
-              
-              {/* Corner brackets */}
-              <div className="absolute top-0 left-0 w-3 h-3 border-t border-l border-blue-500/30 rounded-tl-3xl pointer-events-none" />
-              <div className="absolute top-0 right-0 w-3 h-3 border-t border-r border-blue-500/30 rounded-tr-3xl pointer-events-none" />
-              <div className="absolute bottom-0 left-0 w-3 h-3 border-b border-l border-blue-500/30 rounded-bl-3xl pointer-events-none" />
-              <div className="absolute bottom-0 right-0 w-3 h-3 border-b border-r border-blue-500/30 rounded-br-3xl pointer-events-none" />
-
-              <div className="absolute top-4 left-4 flex items-center gap-2">
-                <Navigation className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 tracking-widest uppercase">{t("livePatrolLabel")}</span>
-              </div>
-
-              <div className="absolute top-4 right-4 flex flex-wrap justify-end gap-3 text-right text-[9px] font-bold font-mono text-blue-600 dark:text-blue-400 z-10">
-                <span>{renderStatusPulse("patrolActiveUnits", "blue")}</span>
-                <span>{renderStatusPulse("patrolSystemMonitoring", "blue")}</span>
-                <span>{renderStatusPulse("patrolResponseReady", "emerald")}</span>
-              </div>
-
-              {/* Grid drawing map canvas */}
-              <div className="w-full h-56 bg-slate-100 dark:bg-slate-950/65 rounded-2xl relative overflow-hidden bg-security-grid border border-slate-200 dark:border-white/5 mt-8">
-                {/* Scanner sweep beam effect */}
-                <div className="absolute inset-0 bg-gradient-to-b from-transparent via-blue-500/5 to-transparent animate-scan-sweep pointer-events-none" />
-                <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-blue-500/5 to-transparent animate-spin-slow pointer-events-none" style={{ animationDuration: "14s" }} />
-
-                {/* Floating digital grid nodes */}
-                <div className="absolute inset-0 opacity-[0.07] bg-[radial-gradient(#3b82f6_1.5px,transparent_1.5px)] [background-size:16px_16px] pointer-events-none animate-pulse" />
-
-                {/* Inner HUD borders */}
-                <div className="absolute top-2 left-2 w-2 h-2 border-t border-l border-blue-500/40 pointer-events-none" />
-                <div className="absolute top-2 right-2 w-2 h-2 border-t border-r border-blue-500/40 pointer-events-none" />
-                <div className="absolute bottom-2 left-2 w-2 h-2 border-b border-l border-blue-500/40 pointer-events-none" />
-                <div className="absolute bottom-2 right-2 w-2 h-2 border-b border-r border-blue-500/40 pointer-events-none" />
-
-                {/* SVG Route Paths */}
-                <svg className="absolute inset-0 w-full h-full">
-                  <path 
-                    d="M 50 160 Q 150 40, 280 120 T 360 40" 
-                    fill="none" 
-                    stroke="rgba(59, 130, 246, 0.2)" 
-                    strokeWidth="2" 
-                    strokeDasharray="4,4"
-                  />
-                  <motion.path 
-                    d="M 50 160 Q 150 40, 280 120 T 360 40" 
-                    fill="none" 
-                    stroke="#3B82F6" 
-                    strokeWidth="2"
-                    initial={{ pathLength: 0 }}
-                    animate={{ pathLength: 1 }}
-                    transition={{ repeat: Infinity, duration: 8, ease: "linear" }}
-                  />
-                </svg>
-
-                {/* Dispatch Destination Node coordinate pin */}
-                <div className="absolute top-[40px] right-[40px] transform -translate-x-1/2 -translate-y-1/2 flex items-center justify-center">
-                  <span className="w-3 h-3 rounded-full bg-blue-500 animate-ping absolute" />
-                  <MapPin className="w-5 h-5 text-blue-600 dark:text-blue-400 z-10 drop-shadow-[0_0_8px_rgba(59,130,246,0.6)]" />
-                </div>
-
-                {/* Moving Police Patrol vehicle beacon */}
-                <div 
-                  style={{ left: `${vehicleX}%`, top: `${vehicleY}%` }}
-                  className="absolute transform -translate-x-1/2 -translate-y-1/2 w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center text-white shadow-lg border border-blue-400 transition-all duration-300 drop-shadow-[0_0_10px_rgba(59,130,246,0.8)]"
-                >
-                  <Activity className="w-3.5 h-3.5 animate-pulse" />
-                </div>
-              </div>
-
-              {/* RESPONSE PERFORMANCE TRACKING */}
-              <div className="border-t border-slate-200 dark:border-white/5 pt-4 mt-4 text-[10px] text-slate-500 dark:text-slate-400 leading-relaxed font-mono flex flex-col sm:flex-row justify-between gap-4 relative">
-                
-                {/* HUD borders */}
-                <div className="absolute top-0 left-0 w-1.5 h-1.5 border-t border-l border-blue-500/25 pointer-events-none" />
-                <div className="absolute top-0 right-0 w-1.5 h-1.5 border-t border-r border-blue-500/25 pointer-events-none" />
-                <div className="absolute bottom-0 left-0 w-1.5 h-1.5 border-b border-l border-blue-500/25 pointer-events-none" />
-                <div className="absolute bottom-0 right-0 w-1.5 h-1.5 border-b border-r border-blue-500/25 pointer-events-none" />
-
-                <div className="space-y-1.5 z-10 p-1">
-                  <p className="font-black text-slate-900 dark:text-white uppercase tracking-wider text-[9px] flex items-center gap-1.5">
-                    <Award className="w-3.5 h-3.5 text-blue-500 drop-shadow-[0_0_4px_rgba(59,130,246,0.4)] animate-pulse" />
-                    {t("routeMetricsLabel")}
-                  </p>
-                  
-                  <div className="flex items-center gap-1.5 text-[9px] text-slate-600 dark:text-slate-400">
-                    <Radio className="w-3 h-3 text-blue-500 animate-[pulse_2.5s_infinite]" />
-                    <span className="opacity-95">{renderSplitText("dispatchUnit", 0)}:</span>
-                    <span className="text-slate-800 dark:text-slate-200 font-bold">{renderSplitText("dispatchUnit", 1)}</span>
-                  </div>
-
-                  <div className="flex items-center gap-1.5 text-[9px] text-slate-600 dark:text-slate-400">
-                    <Map className="w-3 h-3 text-emerald-500" />
-                    {renderStatusPulse("routeStatus", "emerald")}
-                  </div>
-
-                  <div className="flex items-center gap-1.5 text-[9px] text-slate-600 dark:text-slate-400">
-                    <Activity className="w-3 h-3 text-blue-500" />
-                    {renderStatusPulse("movementSync", "blue")}
-                  </div>
-                </div>
-
-                <div className="text-left sm:text-right space-y-1.5 z-10 p-1">
-                  <p className="font-bold text-slate-950 dark:text-white uppercase text-[9px] flex items-center sm:justify-end gap-1.5">
-                    <Shield className="w-3.5 h-3.5 text-indigo-500 drop-shadow-[0_0_4px_rgba(99,102,241,0.4)] animate-pulse" />
-                    {t("currentActivityLabel")}
-                  </p>
-                  
-                  <div className="flex items-center sm:justify-end gap-1.5 text-[9px] text-slate-600 dark:text-slate-400">
-                    <Navigation className="w-3 h-3 text-purple-500 animate-[spin_12s_linear_infinite]" />
-                    <span className="opacity-95">{t("patrolUnit")} ({t("patrolRoute")})</span>
-                  </div>
-
-                  <div className="flex items-center sm:justify-end gap-1.5 text-[9px] text-slate-600 dark:text-slate-400">
-                    <Compass className="w-3 h-3 text-blue-500" />
-                    <span className="opacity-95">{t("patrolMovement")}</span>
-                  </div>
-
-                  <div className="flex items-center sm:justify-end gap-1.5 text-[9px] text-blue-600 dark:text-blue-400 font-extrabold">
-                    <Clock className="w-3 h-3 text-blue-600 dark:text-blue-400 animate-spin" style={{ animationDuration: "6s" }} />
-                    <span className="opacity-95">{renderSplitText("etaCalculating", 0)}:</span>
-                    <span className="text-blue-600 dark:text-blue-400 drop-shadow-[0_0_8px_rgba(59,130,246,0.6)] animate-pulse inline-flex items-center">
-                      {renderSplitText("etaCalculating", 1, "CALCULATING").replace("...", "")}
-                      <span className="inline-block animate-loading-dots w-4 text-left ml-0.5" />
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-            </div>
-
-          </div>
-
-          {/* LOWER SECTION: Cyber logs, Dispatch wave, and Privacy mask */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 z-10">
-            
-            {/* POLICE CYBER DEFENSE CENTER */}
-            <div className="border border-slate-200 dark:border-white/5 rounded-3xl p-5 bg-slate-50/50 dark:bg-slate-950/20 backdrop-blur-xl relative flex flex-col justify-between min-h-[170px]">
-              <div>
-                <div className="flex items-center justify-between mb-3.5">
-                  <div className="flex items-center gap-2">
-                    <Lock className="w-4 h-4 text-emerald-500 animate-pulse" />
-                    <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 tracking-widest uppercase">{t("cyberCommandLabel")}</span>
-                  </div>
-                  <span className="text-[8px] font-bold text-emerald-600 dark:text-emerald-400 font-mono">SYS: SECURE</span>
-                </div>
-                
-                {/* Real-world cyber logs */}
-                <div className="space-y-1 font-mono text-[9px] text-slate-600 dark:text-emerald-400 bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-white/5 p-3 rounded-xl overflow-hidden leading-snug">
-                  {cyberCodeLog.map((log, i) => (
-                    <div key={i} className="truncate">{log}</div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="text-[9px] font-mono text-slate-500 dark:text-slate-400 mt-3 pt-3 border-t border-slate-200 dark:border-white/5 uppercase font-bold flex flex-wrap justify-between gap-1">
-                <span>{t("cyberSystemSecure")} | {t("cyberNetworkProtected")}</span>
-                <span className="text-emerald-600 dark:text-emerald-400 font-black">{t("cyberSecLevel")}</span>
-              </div>
-            </div>
-
-            {/* EMERGENCY COMMUNICATION NETWORK */}
-            <div className="border border-slate-200 dark:border-white/5 rounded-3xl p-5 bg-slate-50/50 dark:bg-slate-950/20 backdrop-blur-xl relative flex flex-col justify-between min-h-[170px]">
-              <div>
-                <div className="flex items-center justify-between mb-3.5">
-                  <div className="flex items-center gap-2">
-                    <Rss className="w-4 h-4 text-blue-600 dark:text-blue-400 animate-pulse" />
-                    <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 tracking-widest uppercase">{t("dispatchControlLabel")}</span>
-                  </div>
-                  
-                  {/* Waveforms */}
-                  <div className="flex items-end gap-0.5 h-3">
-                    {[0.5, 1.0, 0.3, 0.7, 0.4].map((delay, index) => (
-                      <div 
-                        key={index}
-                        className="w-0.5 bg-blue-500 animate-wave-bounce" 
-                        style={{ height: "100%", animationDelay: `${delay}s`, animationDuration: "1s" }}
-                      />
-                    ))}
-                  </div>
-                </div>
-
-                <div className="bg-slate-100 dark:bg-slate-950 p-2.5 rounded-xl border border-slate-200 dark:border-white/5 text-[9px] leading-relaxed font-mono">
-                  <div className="flex justify-between mb-1">
-                    <span>{renderSplitText("dispatchStatusConnected", 0)}:</span>
-                    <span className="text-blue-600 dark:text-blue-400 font-bold">{renderSplitText("dispatchStatusConnected", 1)}</span>
-                  </div>
-                  <div className="flex justify-between mb-1">
-                    <span>{renderSplitText("dispatchEmergencyChannel", 0)}:</span>
-                    <span className="text-emerald-600 dark:text-emerald-400 font-bold">{renderSplitText("dispatchEmergencyChannel", 1)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>{renderSplitText("dispatchUnitAvailable", 0)}:</span>
-                    <span className="text-indigo-600 dark:text-indigo-400 font-bold">{renderSplitText("dispatchUnitAvailable", 1)}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="text-[9px] text-slate-500 dark:text-slate-400 border-t border-slate-200 dark:border-white/5 pt-3 uppercase font-bold tracking-wide">
-                {t("dispatchNetworkType")}
-              </div>
-            </div>
-
-            {/* CITIZEN IDENTITY PROTECTION */}
-            <div className="border border-slate-200 dark:border-white/5 rounded-3xl p-5 bg-slate-50/50 dark:bg-slate-950/20 backdrop-blur-xl relative flex flex-col justify-between min-h-[170px] overflow-hidden">
-              <div className="absolute top-0 w-[40%] h-full bg-gradient-to-r from-transparent via-white/5 dark:via-white/10 to-transparent skew-x-12 animate-sheen-sweep pointer-events-none" />
-              
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <UserCheck className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                    <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 tracking-widest uppercase">{t("privacyProtocolLabel")}</span>
-                  </div>
-                  <span className="text-[8px] font-bold text-emerald-500 uppercase">{t("privacyStatusProtected")}</span>
-                </div>
-                
-                <div className="bg-slate-100 dark:bg-slate-950 p-2.5 rounded-xl border border-slate-200 dark:border-white/5 text-[9px] leading-relaxed font-mono">
-                  <div className="flex justify-between mb-1">
-                    <span>{t("privacyIdentityShield")}</span>
-                  </div>
-                  <div className="flex justify-between mb-1">
-                    <span>{t("privacyPersonalData")}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>{renderSplitText("privacyCitizenId", 0)}:</span>
-                    <span className="text-slate-400 truncate max-w-[120px] font-bold">{maskedCitizenId}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="text-[9px] text-slate-500 dark:text-slate-400 border-t border-slate-200 dark:border-white/5 pt-3 uppercase font-bold tracking-wide">
-                {t("privacySecurityMethod")}
-              </div>
-            </div>
-
-          </div>
-
-        </div>
-      </section>
 
       {/* MUKKOM POLICE STATION DETAILS SECTION */}
       <section className="relative z-10 max-w-7xl mx-auto px-6 py-12">
@@ -1323,119 +895,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* MUKKOM POLICE STATION INFO SECTION */}
-      <section className="relative z-10 max-w-7xl mx-auto px-6 py-12">
-        <div className="text-center mb-10">
-          <span className="text-[10px] font-black text-blue-600 dark:text-blue-400 tracking-widest uppercase">Kozhikode Rural</span>
-          <h3 className="text-2xl font-extrabold text-slate-900 dark:text-white mt-1">Mukkom Police Station</h3>
-        </div>
-
-        <div className="border border-slate-200 dark:border-white/5 rounded-3xl bg-white/60 dark:bg-slate-950/20 backdrop-blur-xl relative overflow-hidden">
-          <div className="absolute top-0 w-full h-1 bg-gradient-to-r from-blue-600 to-indigo-600" />
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-8 relative z-10">
-            {/* Contact Info */}
-            <div className="space-y-6">
-              <div className="flex items-start gap-4">
-                <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center shrink-0">
-                  <Phone className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                </div>
-                <div>
-                  <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">Emergency Lines</p>
-                  <p className="text-sm font-semibold text-slate-900 dark:text-white mb-0.5">Mobile: <a href="tel:9497947245" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">9497947245</a></p>
-                  <p className="text-sm font-semibold text-slate-900 dark:text-white mb-0.5">Landline: <a href="tel:04952297133" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">0495-2297133</a></p>
-                  <p className="text-xs text-slate-500 font-mono mt-1">VPN: 15229</p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-4">
-                <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center shrink-0">
-                  <Mail className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                </div>
-                <div>
-                  <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">Official Email</p>
-                  <a href="mailto:shomukkmkkdrl.pol@kerala.gov.in" className="text-sm font-semibold text-slate-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors break-all">shomukkmkkdrl.pol@kerala.gov.in</a>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-4">
-                <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center shrink-0">
-                  <Clock className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                </div>
-                <div>
-                  <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">Operating Hours</p>
-                  <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-500/10 border border-emerald-500/20">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping absolute" />
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                    <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">OPEN 24 HOURS, 7 DAYS A WEEK</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Location Info */}
-            <div className="space-y-6">
-              <div className="flex items-start gap-4">
-                <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center shrink-0">
-                  <MapPin className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                </div>
-                <div>
-                  <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">Station Address</p>
-                  <p className="text-sm font-semibold text-slate-900 dark:text-white leading-relaxed">
-                    Koyilandy - Edavanna Road, <br/>
-                    Health Centre Road, Mukkom Post, <br/>
-                    Kozhikode, Kerala - 673602
-                  </p>
-                  <a href="https://maps.google.com/?q=Mukkom+Police+Station+Kerala" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs font-bold text-blue-600 dark:text-blue-400 mt-2 hover:underline">
-                    View on Map <ChevronRight className="w-3 h-3" />
-                  </a>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-4">
-                <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center shrink-0">
-                  <Map className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                </div>
-                <div>
-                  <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">Jurisdiction Metrics</p>
-                  <p className="text-sm font-semibold text-slate-900 dark:text-white mb-0.5">Total Area: <span className="font-normal text-slate-600 dark:text-slate-400">89.63 sq km</span></p>
-                  <p className="text-sm font-semibold text-slate-900 dark:text-white mb-0.5">Population: <span className="font-normal text-slate-600 dark:text-slate-400">102,312 citizens</span></p>
-                </div>
-              </div>
-            </div>
-
-            {/* Jurisdiction Details */}
-            <div className="space-y-6 lg:border-l border-slate-200 dark:border-white/5 lg:pl-6">
-              <div className="flex items-start gap-4">
-                <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center shrink-0">
-                  <Shield className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                </div>
-                <div>
-                  <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2">Covered Territories</p>
-                  <div className="space-y-3">
-                    <div>
-                      <span className="text-[9px] font-bold text-slate-400 uppercase">Municipality</span>
-                      <p className="text-xs font-semibold text-slate-900 dark:text-white">Mukkom Municipality</p>
-                    </div>
-                    <div>
-                      <span className="text-[9px] font-bold text-slate-400 uppercase">Grama Panchayaths</span>
-                      <p className="text-xs font-semibold text-slate-900 dark:text-white">Karassery & Kodiyathoor</p>
-                    </div>
-                    <div>
-                      <span className="text-[9px] font-bold text-slate-400 uppercase">Villages</span>
-                      <p className="text-xs font-semibold text-slate-900 dark:text-white">Thazhekode, Neeleswaram, Kumaranelloor, Kakkad, Kodiyathor</p>
-                    </div>
-                    <div>
-                      <span className="text-[9px] font-bold text-slate-400 uppercase">Bordering Districts</span>
-                      <p className="text-xs font-semibold text-slate-900 dark:text-white">Malappuram & Kozhikode City</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
 
       {/* HORIZONTAL SAFETY TIMELINE TRACKER (Incident Timeline Visualization) */}
       <section className="relative z-10 max-w-7xl mx-auto px-6 py-12">
@@ -1505,6 +964,11 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* ==============================================================================
+      FUTURISTIC TACTICAL DASHBOARD FOOTER
+      ============================================================================== */}
+      <TacticalFooter />
+
       {/* FLOATING SYSTEMS HUDS: Language Selector, SOS, and Police Network Pulse */}
       <div className="fixed bottom-24 right-6 z-40 flex flex-col items-end gap-3.5">
         
@@ -1517,7 +981,7 @@ export default function LandingPage() {
               initial={{ opacity: 0, scale: 0.9, y: 15 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 15 }}
-              className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-white/5 rounded-2xl p-5 shadow-2xl w-80 text-left relative z-50 animate-siren-glow"
+              className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-white/5 rounded-2xl p-5 shadow-2xl w-80 text-left relative z-50"
             >
               <button 
                 onClick={() => setSelectedRadarBlip(null)}
@@ -1581,7 +1045,7 @@ export default function LandingPage() {
               initial={{ opacity: 0, scale: 0.95, y: 15 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 15 }}
-              className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-white/5 rounded-3xl w-full max-w-md p-7 relative shadow-2xl z-10 animate-siren-glow"
+              className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-white/5 rounded-3xl w-full max-w-md p-7 relative shadow-2xl z-10"
             >
               <button 
                 onClick={() => setIsAuthModalOpen(false)}
@@ -1633,7 +1097,7 @@ export default function LandingPage() {
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-white/5 rounded-3xl w-full max-w-lg p-7 relative shadow-2xl overflow-hidden z-10 animate-siren-glow"
+              className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-white/5 rounded-3xl w-full max-w-lg p-7 relative shadow-2xl overflow-hidden z-10"
             >
               {showConfetti && <ConfettiEffect />}
 
@@ -1733,7 +1197,7 @@ export default function LandingPage() {
                         </div>
                         <button 
                           onClick={() => setAttachedFile(null)} 
-                          className="text-[10px] text-red-500 hover:text-red-400 cursor-pointer border-none bg-transparent"
+                          className="text-[10px] text-slate-500 hover:text-rose-500 dark:text-slate-400 dark:hover:text-rose-400 cursor-pointer border-none bg-transparent transition-colors"
                         >
                           Remove
                         </button>

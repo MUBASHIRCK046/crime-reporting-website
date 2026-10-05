@@ -11,8 +11,7 @@ import {
   createUserWithEmailAndPassword, 
   signInWithEmailAndPassword,
   updatePassword,
-  signOut,
-  User 
+  signOut
 } from "firebase/auth";
 import { doc, setDoc, getDoc, updateDoc, collection, query, where, getDocs } from "firebase/firestore";
 import { auth, db } from "@/firebase/client";

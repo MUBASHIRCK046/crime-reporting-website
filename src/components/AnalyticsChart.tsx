@@ -111,7 +111,7 @@ export default function AnalyticsChart({
       className="grid grid-cols-1 lg:grid-cols-3 gap-6 relative w-full select-none"
     >
       {/* LEFT: MAIN CHART (70% width or 2/3 columns) */}
-      <div className="lg:col-span-2 glass-panel p-6 border border-white/10 dark:border-white/5 bg-slate-900/40 relative overflow-hidden flex flex-col justify-between h-[320px]">
+      <div className="lg:col-span-2 glass-panel p-6 border border-slate-200/90 dark:border-white/5 bg-white/95 dark:bg-slate-900/40 shadow-md dark:shadow-xl relative overflow-hidden flex flex-col justify-between h-[320px]">
         {/* Soft Radial Glow behind chart */}
         <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-cyan-500/10 blur-[40px] pointer-events-none" />
         <div className="absolute -bottom-10 -left-10 w-40 h-40 rounded-full bg-blue-500/10 blur-[40px] pointer-events-none" />
@@ -119,14 +119,14 @@ export default function AnalyticsChart({
         {/* Chart Header */}
         <div className="flex items-center justify-between z-10 mb-4">
           <div>
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
               Case Resolution Activity
             </h3>
-            <p className="text-lg font-bold text-slate-100 flex items-center gap-1.5 mt-0.5">
-              Weekly Solve Rate <span className="text-xs text-cyan-400 font-semibold flex items-center gap-0.5"><TrendingUp className="w-3.5 h-3.5"/> +18%</span>
+            <p className="text-lg font-black text-slate-900 dark:text-slate-100 flex items-center gap-1.5 mt-0.5">
+              Weekly Solve Rate <span className="text-xs text-cyan-600 dark:text-cyan-400 font-bold flex items-center gap-0.5"><TrendingUp className="w-3.5 h-3.5"/> +18%</span>
             </p>
           </div>
-          <div className="text-[10px] uppercase font-bold text-slate-400 border border-white/10 px-2 py-1 rounded bg-slate-950/20">
+          <div className="text-[10px] uppercase font-bold text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-white/10 px-2.5 py-1 rounded-md bg-slate-100/80 dark:bg-slate-950/20">
             Realtime Grid
           </div>
         </div>
@@ -155,7 +155,7 @@ export default function AnalyticsChart({
               </linearGradient>
               {/* Grid Line Dash */}
               <pattern id="grid-pattern" width="10" height="10" patternUnits="userSpaceOnUse">
-                <line x1="0" y1="0" x2="10" y2="0" stroke="rgba(255,255,255,0.02)" />
+                <line x1="0" y1="0" x2="10" y2="0" className="stroke-slate-200/50 dark:stroke-white/[0.02]" />
               </pattern>
             </defs>
 
@@ -164,23 +164,22 @@ export default function AnalyticsChart({
 
             {/* Horizontal Grid lines */}
             {gridLines.map((line, idx) => (
-              <g key={idx} className="opacity-40">
+              <g key={idx} className="opacity-60 dark:opacity-40">
                 <line
                   x1={paddingX}
                   y1={line.y}
                   x2={chartWidth - 20}
                   y2={line.y}
-                  stroke="rgba(255,255,255,0.07)"
+                  className="stroke-slate-200 dark:stroke-white/[0.07]"
                   strokeWidth="1"
                   strokeDasharray="3, 3"
                 />
                 <text
                   x={paddingX - 10}
                   y={line.y + 4}
-                  fill="rgba(148, 163, 184, 0.7)"
                   fontSize="10"
                   textAnchor="end"
-                  className="font-mono"
+                  className="font-mono font-bold fill-slate-500 dark:fill-slate-400"
                 >
                   {line.val}
                 </text>
@@ -209,10 +208,9 @@ export default function AnalyticsChart({
                 key={idx}
                 x={pt.x}
                 y={chartHeight - 8}
-                fill="rgba(148, 163, 184, 0.7)"
                 fontSize="10"
                 textAnchor="middle"
-                className="font-semibold"
+                className="font-bold fill-slate-600 dark:fill-slate-400"
               >
                 {pt.label}
               </text>
@@ -227,7 +225,7 @@ export default function AnalyticsChart({
                   y1={20}
                   x2={points[hoveredIndex].x}
                   y2={chartHeight - paddingY}
-                  stroke="rgba(6, 182, 212, 0.4)"
+                  stroke="rgba(6, 182, 212, 0.6)"
                   strokeWidth="1.5"
                   strokeDasharray="4, 4"
                 />
@@ -237,7 +235,7 @@ export default function AnalyticsChart({
                   cy={points[hoveredIndex].y}
                   r="7"
                   fill="#06b6d4"
-                  opacity="0.3"
+                  opacity="0.4"
                   className="animate-ping"
                 />
                 {/* Solid Core Dot */}
@@ -262,16 +260,16 @@ export default function AnalyticsChart({
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 5, scale: 0.95 }}
               transition={{ duration: 0.15 }}
-              className="absolute bg-slate-950/90 border border-cyan-500/30 text-white rounded-xl p-2.5 shadow-2xl backdrop-blur-md z-30 pointer-events-none"
+              className="absolute bg-slate-900/95 dark:bg-slate-950/90 border border-cyan-500/40 text-white rounded-xl p-2.5 shadow-2xl backdrop-blur-md z-30 pointer-events-none"
               style={{
                 left: `${Math.min(75, Math.max(5, (points[hoveredIndex].x / chartWidth) * 100 - 15))}%`,
                 top: `${(points[hoveredIndex].y / chartHeight) * 70 + 40}px`
               }}
             >
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+              <p className="text-[10px] font-bold text-slate-300 dark:text-slate-400 uppercase tracking-wider">
                 {points[hoveredIndex].label} Activity
               </p>
-              <p className="text-sm font-extrabold text-cyan-400 mt-0.5">
+              <p className="text-sm font-black text-cyan-300 dark:text-cyan-400 mt-0.5">
                 {points[hoveredIndex].value} Cases Solved
               </p>
             </motion.div>
@@ -280,17 +278,17 @@ export default function AnalyticsChart({
       </div>
 
       {/* RIGHT: PRECINCT STATUS MONITOR (30% width or 1/3 columns) */}
-      <div className="glass-panel p-6 border border-white/10 dark:border-white/5 bg-slate-900/40 relative overflow-hidden flex flex-col justify-between h-[320px]">
+      <div className="glass-panel p-6 border border-slate-200/90 dark:border-white/5 bg-white/95 dark:bg-slate-900/40 shadow-md dark:shadow-xl relative overflow-hidden flex flex-col justify-between h-[320px]">
         {/* Glow */}
         <div className="absolute -bottom-10 -right-10 w-36 h-36 rounded-full bg-purple-500/10 blur-[40px] pointer-events-none" />
 
-        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2.5">
+        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2.5">
           Precinct Status Monitor
         </h3>
 
         <div className="flex-1 flex flex-col justify-around">
           {/* Active Officers Circular Progress Ring */}
-          <div className="flex items-center gap-4 bg-slate-950/20 border border-white/5 p-3 rounded-xl">
+          <div className="flex items-center gap-4 bg-slate-50 dark:bg-slate-950/20 border border-slate-200/80 dark:border-white/5 p-3 rounded-xl">
             <div className="relative w-14 h-14 shrink-0">
               <svg className="w-full h-full transform -rotate-90" viewBox="0 0 80 80">
                 <circle
@@ -298,7 +296,7 @@ export default function AnalyticsChart({
                   cy="40"
                   r={radius}
                   fill="transparent"
-                  stroke="rgba(255,255,255,0.06)"
+                  className="stroke-slate-200 dark:stroke-white/[0.06]"
                   strokeWidth="5"
                 />
                 <circle
@@ -306,7 +304,7 @@ export default function AnalyticsChart({
                   cy="40"
                   r={radius}
                   fill="transparent"
-                  stroke="#22d3ee"
+                  stroke="#06b6d4"
                   strokeWidth="5"
                   strokeDasharray={circ}
                   strokeDashoffset={strokeOffset}
@@ -315,26 +313,26 @@ export default function AnalyticsChart({
                 />
               </svg>
               <div className="absolute inset-0 flex items-center justify-center">
-                <Users className="w-4 h-4 text-cyan-400" />
+                <Users className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
               </div>
             </div>
             <div>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">
+              <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest leading-none">
                 Active Deployment
               </p>
-              <p className="text-lg font-black text-slate-100 mt-1">
+              <p className="text-lg font-black text-slate-900 dark:text-slate-100 mt-1">
                 {activeOfficers} / {totalOfficers} Officers
               </p>
-              <span className="text-[10px] text-cyan-400 font-semibold bg-cyan-950/30 border border-cyan-800/20 px-1.5 py-0.5 rounded">
+              <span className="text-[10px] text-cyan-700 dark:text-cyan-400 font-bold bg-cyan-50 dark:bg-cyan-950/30 border border-cyan-200 dark:border-cyan-800/20 px-1.5 py-0.5 rounded">
                 100% On-Duty Grid
               </span>
             </div>
           </div>
 
           {/* Pending Cases */}
-          <div className="flex items-center justify-between bg-slate-950/20 border border-white/5 p-3 rounded-xl">
+          <div className="flex items-center justify-between bg-slate-50 dark:bg-slate-950/20 border border-slate-200/80 dark:border-white/5 p-3 rounded-xl">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-lg bg-yellow-500/10 border border-yellow-500/20 flex items-center justify-center text-yellow-500 relative">
+              <div className="w-9 h-9 rounded-lg bg-yellow-500/10 border border-yellow-500/30 flex items-center justify-center text-yellow-600 dark:text-yellow-500 relative">
                 <Clock className="w-5 h-5" />
                 <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75"></span>
@@ -342,35 +340,35 @@ export default function AnalyticsChart({
                 </span>
               </div>
               <div>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">
+                <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest leading-none">
                   Active Dispatch Pipeline
                 </p>
-                <p className="text-sm font-bold text-slate-200 mt-1">
+                <p className="text-sm font-bold text-slate-900 dark:text-slate-200 mt-1">
                   {pendingCases} Cases Pending
                 </p>
               </div>
             </div>
-            <span className="text-[10px] font-mono font-bold text-yellow-500 bg-yellow-500/10 border border-yellow-500/20 px-2 py-0.5 rounded-full">
+            <span className="text-[10px] font-mono font-bold text-yellow-700 dark:text-yellow-400 bg-yellow-100 dark:bg-yellow-500/10 border border-yellow-300 dark:border-yellow-500/20 px-2 py-0.5 rounded-full">
               Urgent
             </span>
           </div>
 
           {/* Solved Cases */}
-          <div className="flex items-center justify-between bg-slate-950/20 border border-white/5 p-3 rounded-xl">
+          <div className="flex items-center justify-between bg-slate-50 dark:bg-slate-950/20 border border-slate-200/80 dark:border-white/5 p-3 rounded-xl">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-500">
+              <div className="w-9 h-9 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-600 dark:text-emerald-500">
                 <CheckCircle2 className="w-5 h-5" />
               </div>
               <div>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">
+                <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest leading-none">
                   Precision Resolve
                 </p>
-                <p className="text-sm font-bold text-slate-200 mt-1">
+                <p className="text-sm font-bold text-slate-900 dark:text-slate-200 mt-1">
                   {solvedCases} solved overall
                 </p>
               </div>
             </div>
-            <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
+            <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-500/10 border border-emerald-300 dark:border-emerald-500/20 px-2 py-0.5 rounded-full">
               Precinct Record
             </span>
           </div>

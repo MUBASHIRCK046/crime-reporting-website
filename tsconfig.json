@@ -18,6 +18,7 @@
         "name": "next"
       }
     ],
+    "tsBuildInfoFile": "./node_modules/.cache/tsconfig.tsbuildinfo",
     "paths": {
       "@/*": ["./src/*"]
     }
@@ -30,5 +31,5 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules", "backup"]
+  "exclude": ["node_modules", "backup", "prompt_docs", "scripts", "public", ".next", "out", "build"]
 }

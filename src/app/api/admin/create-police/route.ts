@@ -77,7 +77,8 @@ export async function POST(request: Request) {
       email, 
       name, 
       adminUid,
-      badgeNumber
+      badgeNumber,
+      adminIdToken
     } = body;
 
     if (!email || !name || !adminUid || !badgeNumber) {
@@ -169,77 +170,200 @@ export async function POST(request: Request) {
       }
     } else {
       // ----------------------------------------------------
-      // FALLBACK MODE: Use Client Firebase SDK on the server (does not require private key!)
+      // FALLBACK MODE: Use Firebase REST API (works in Node.js server without Admin SDK)
+      // The client-side Firebase Auth SDK CANNOT be used in server-side API routes because
+      // it depends on browser-only APIs (IndexedDB, localStorage) and will hang indefinitely.
       // ----------------------------------------------------
-      try {
-        const { initializeApp: clientInitializeApp, getApps: clientGetApps, getApp: clientGetApp } = await import("firebase/app");
-        const { getAuth: clientGetAuth, createUserWithEmailAndPassword: clientCreateUser } = await import("firebase/auth");
-        const { getFirestore: clientGetFirestore, doc: clientDoc, setDoc: clientSetDoc, collection: clientCollection, query: clientQuery, where: clientWhere, getDocs: clientGetDocs } = await import("firebase/firestore");
+      const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
+      const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "crime-assist";
 
-        const clientFirebaseConfig = {
-          apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-          authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-          projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-          storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-          messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-          appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID
-        };
-
-        const fallbackAppName = "police-creation-fallback";
-        const fallbackApp = !clientGetApps().some(app => app.name === fallbackAppName)
-          ? clientInitializeApp(clientFirebaseConfig, fallbackAppName)
-          : clientGetApp(fallbackAppName);
-
-        const fallbackAuth = clientGetAuth(fallbackApp);
-        const fallbackDb = clientGetFirestore(fallbackApp);
-
-        // Verify duplicate Email in fallback Firestore
-        const qEmail = clientQuery(clientCollection(fallbackDb, "users"), clientWhere("email", "==", email));
-        const emailSnap = await clientGetDocs(qEmail);
-        if (!emailSnap.empty) {
-          return NextResponse.json({ error: "An account already exists for this email address." }, { status: 400 });
-        }
-
-        // Verify duplicate Badge Number in fallback Firestore
-        const qBadge = clientQuery(clientCollection(fallbackDb, "users"), clientWhere("badgeNumber", "==", badgeNumber));
-        const badgeSnap = await clientGetDocs(qBadge);
-        if (!badgeSnap.empty) {
-          return NextResponse.json({ error: `A police officer with badge number '${badgeNumber}' already exists.` }, { status: 400 });
-        }
-
-        // Verify unique Police ID
-        const qPoliceId = clientQuery(clientCollection(fallbackDb, "users"), clientWhere("policeId", "==", autoPoliceId));
-        const policeIdSnap = await clientGetDocs(qPoliceId);
-        if (!policeIdSnap.empty) {
-          return NextResponse.json({ error: `A police officer with Police ID '${autoPoliceId}' already exists.` }, { status: 400 });
-        }
-
-        // Create Auth account using client SDK on the server
-        let userCredential;
-        try {
-          userCredential = await clientCreateUser(fallbackAuth, email, autoTemporaryPassword);
-          uid = userCredential.user.uid;
-        } catch (authErr: any) {
-          console.error("Fallback auth creation error:", authErr);
-          if (authErr.code === "auth/email-already-in-use") {
-            return NextResponse.json({ error: "An account already exists for this email address in Firebase Authentication." }, { status: 400 });
-          }
-          return NextResponse.json({ error: `Failed to create authentication account: ${authErr.message}` }, { status: 400 });
-        }
-
-        // Write Firestore Profile using client SDK on the server
-        policeProfileData = buildProfileData(uid, autoTemporaryPassword, body, autoPoliceId);
-        try {
-          await clientSetDoc(clientDoc(fallbackDb, "users", uid), policeProfileData);
-        } catch (dbErr: any) {
-          console.error("Fallback firestore write error:", dbErr);
-          return NextResponse.json({ error: `Failed to create database record: ${dbErr.message}` }, { status: 500 });
-        }
-      } catch (fallbackErr: any) {
-        console.error("Fallback creation error:", fallbackErr);
-        return NextResponse.json({ 
-          error: `Server authentication credentials are not configured. Please configure them in .env.local to enable Admin operations.` 
+      if (!apiKey) {
+        return NextResponse.json({
+          error: "Firebase API key is not configured. Please check your .env.local file."
         }, { status: 500 });
+      }
+
+      // Use Firestore REST API to check for duplicate email
+      const firestoreBase = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents`;
+
+      // Query Firestore REST API for duplicate email
+
+      const emailQueryBody = {
+        structuredQuery: {
+          from: [{ collectionId: "users" }],
+          where: {
+            fieldFilter: {
+              field: { fieldPath: "email" },
+              op: "EQUAL",
+              value: { stringValue: email }
+            }
+          },
+          limit: 1
+        }
+      };
+
+      // Build auth header using admin's token if available (for read queries)
+      const authHeaders: Record<string, string> = { "Content-Type": "application/json" };
+      if (adminIdToken) authHeaders["Authorization"] = `Bearer ${adminIdToken}`;
+
+      const emailCheckRes = await fetch(
+        `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents:runQuery?key=${apiKey}`,
+        {
+          method: "POST",
+          headers: authHeaders,
+          body: JSON.stringify(emailQueryBody)
+        }
+      );
+      const emailCheckData = await emailCheckRes.json();
+      const emailExists = Array.isArray(emailCheckData) && emailCheckData.some((r: any) => r.document);
+      if (emailExists) {
+        return NextResponse.json({ error: "An account already exists for this email address." }, { status: 400 });
+      }
+
+      // Query Firestore REST API for duplicate badge number
+      const badgeQueryBody = {
+        structuredQuery: {
+          from: [{ collectionId: "users" }],
+          where: {
+            fieldFilter: {
+              field: { fieldPath: "badgeNumber" },
+              op: "EQUAL",
+              value: { stringValue: String(badgeNumber) }
+            }
+          },
+          limit: 1
+        }
+      };
+
+      const badgeCheckRes = await fetch(
+        `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents:runQuery?key=${apiKey}`,
+        {
+          method: "POST",
+          headers: authHeaders,
+          body: JSON.stringify(badgeQueryBody)
+        }
+      );
+      const badgeCheckData = await badgeCheckRes.json();
+      const badgeExists = Array.isArray(badgeCheckData) && badgeCheckData.some((r: any) => r.document);
+      if (badgeExists) {
+        return NextResponse.json({ error: `A police officer with badge number '${badgeNumber}' already exists.` }, { status: 400 });
+      }
+
+      // Query Firestore REST API for duplicate police ID
+      const policeIdQueryBody = {
+        structuredQuery: {
+          from: [{ collectionId: "users" }],
+          where: {
+            fieldFilter: {
+              field: { fieldPath: "policeId" },
+              op: "EQUAL",
+              value: { stringValue: autoPoliceId }
+            }
+          },
+          limit: 1
+        }
+      };
+
+      const policeIdCheckRes = await fetch(
+        `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents:runQuery?key=${apiKey}`,
+        {
+          method: "POST",
+          headers: authHeaders,
+          body: JSON.stringify(policeIdQueryBody)
+        }
+      );
+      const policeIdCheckData = await policeIdCheckRes.json();
+      const policeIdExists = Array.isArray(policeIdCheckData) && policeIdCheckData.some((r: any) => r.document);
+      if (policeIdExists) {
+        return NextResponse.json({ error: `A police officer with Police ID '${autoPoliceId}' already exists.` }, { status: 400 });
+      }
+
+      // Create Firebase Auth user via REST API (works in Node.js server environment)
+      // returnSecureToken: true — we need the new officer's ID token to authenticate the Firestore write
+      const signUpRes = await fetch(
+        `https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${apiKey}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email,
+            password: autoTemporaryPassword,
+            displayName: name,
+            returnSecureToken: true
+          })
+        }
+      );
+
+      const signUpData = await signUpRes.json();
+      if (!signUpRes.ok || signUpData.error) {
+        const errMsg = signUpData.error?.message || "Failed to create authentication account.";
+        if (errMsg.includes("EMAIL_EXISTS")) {
+          return NextResponse.json({ error: "An account already exists for this email address in Firebase Authentication." }, { status: 400 });
+        }
+        return NextResponse.json({ error: `Failed to create authentication account: ${errMsg}` }, { status: 400 });
+      }
+
+      uid = signUpData.localId;
+      // The new officer's ID token — used to authenticate the Firestore write.
+      // Firestore rule: `allow create: if request.auth.uid == userId`
+      // Since the doc ID IS the new officer's UID, using their own token satisfies this rule.
+      const newOfficerIdToken = signUpData.idToken;
+
+      // Write Firestore profile via REST API
+      policeProfileData = buildProfileData(uid, autoTemporaryPassword, body, autoPoliceId);
+
+      // Convert profile to Firestore REST API format
+      function toFirestoreValue(value: any): any {
+        if (value === null || value === undefined) return { nullValue: null };
+        if (typeof value === "boolean") return { booleanValue: value };
+        if (typeof value === "number") return Number.isInteger(value) ? { integerValue: String(value) } : { doubleValue: value };
+        if (typeof value === "string") return { stringValue: value };
+        if (Array.isArray(value)) return { arrayValue: { values: value.map(toFirestoreValue) } };
+        if (typeof value === "object") {
+          const fields: Record<string, any> = {};
+          for (const [k, v] of Object.entries(value)) fields[k] = toFirestoreValue(v);
+          return { mapValue: { fields } };
+        }
+        return { stringValue: String(value) };
+      }
+
+      const firestoreFields: Record<string, any> = {};
+      for (const [k, v] of Object.entries(policeProfileData)) {
+        firestoreFields[k] = toFirestoreValue(v);
+      }
+
+      // Use the new officer's own ID token as Bearer auth — satisfies `request.auth.uid == userId`
+      const writeHeaders: Record<string, string> = { "Content-Type": "application/json" };
+      if (newOfficerIdToken) writeHeaders["Authorization"] = `Bearer ${newOfficerIdToken}`;
+
+      const firestoreWriteRes = await fetch(
+        `${firestoreBase}/users/${uid}?key=${apiKey}`,
+        {
+          method: "PATCH",
+          headers: writeHeaders,
+          body: JSON.stringify({ fields: firestoreFields })
+        }
+      );
+
+      if (!firestoreWriteRes.ok) {
+        const fsErr = await firestoreWriteRes.json();
+        console.error("Firestore REST write error:", fsErr);
+        // Attempt to clean up the orphaned Auth user via REST API
+        try {
+          if (newOfficerIdToken) {
+            await fetch(
+              `https://identitytoolkit.googleapis.com/v1/accounts:delete?key=${apiKey}`,
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ idToken: newOfficerIdToken })
+              }
+            );
+          }
+        } catch (cleanupErr) {
+          console.error("Failed to clean up orphaned auth user:", cleanupErr);
+        }
+        return NextResponse.json({ error: `Failed to create database record: ${fsErr?.error?.message || "Unknown error"}` }, { status: 500 });
       }
     }
 

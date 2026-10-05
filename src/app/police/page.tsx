@@ -11,6 +11,8 @@ import { toast } from "sonner";
 import { CaseLog } from "@/lib/types";
 import { exportCaseToPDF, printCaseDetails } from "@/lib/export";
 import { getUserProfile } from "@/lib/profile";
+import { formatCaseId } from "@/shared/utils/caseId";
+import EvidenceGallery from "@/components/EvidenceGallery";
 
 export default function PoliceDashboard() {
   const router = useRouter();
@@ -49,27 +51,37 @@ export default function PoliceDashboard() {
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(async (user) => {
       if (!user) {
+        setLoading(false);
         router.push("/login");
         return;
       }
 
-      const userDoc = await getDoc(doc(db, "users", user.uid));
-      if (userDoc.exists()) {
-        const userData = userDoc.data();
-        if (userData.role === "police") {
-          setCurrentUser({ uid: user.uid, ...userData });
-          if (userData.mustChangePassword) {
-            router.push("/police/change-password");
-            return;
+      try {
+        const userDoc = await getDoc(doc(db, "users", user.uid));
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          if (userData.role === "police") {
+            setCurrentUser({ uid: user.uid, ...userData });
+            if (userData.mustChangePassword) {
+              setLoading(false);
+              router.push("/police/change-password");
+              return;
+            }
+            fetchDashboardData(user.uid);
+          } else if (userData.role === "admin") {
+            setLoading(false);
+            router.push("/admin");
+          } else {
+            setLoading(false);
+            router.push("/citizen");
           }
-          fetchDashboardData(user.uid);
-        } else if (userData.role === "admin") {
-          router.push("/admin");
         } else {
-          router.push("/citizen");
+          setLoading(false);
+          router.push("/login");
         }
-      } else {
-        router.push("/login");
+      } catch (err) {
+        console.error("Police auth error:", err);
+        setLoading(false);
       }
     });
     return () => unsubscribe();
@@ -80,9 +92,14 @@ export default function PoliceDashboard() {
     const fetchLogs = async () => {
       if (selectedComplaint) {
         setFetchingLogs(true);
-        const { logs } = await getCaseLogs(selectedComplaint.id);
-        setCaseLogs(logs);
-        setFetchingLogs(false);
+        try {
+          const { logs } = await getCaseLogs(selectedComplaint.id);
+          setCaseLogs(logs);
+        } catch (err) {
+          console.error("Error fetching case logs:", err);
+        } finally {
+          setFetchingLogs(false);
+        }
       } else {
         setCaseLogs([]);
       }
@@ -92,12 +109,19 @@ export default function PoliceDashboard() {
 
   const fetchDashboardData = async (officerId: string) => {
     setLoading(true);
-    const complaintsResult = await getAssignedCases(officerId);
-    const sosResult = await getActiveSOSAlerts();
-    
-    if (!complaintsResult.error) setComplaints(complaintsResult.complaints);
-    if (!sosResult.error) setSosAlerts(sosResult.alerts);
-    setLoading(false);
+    try {
+      const [complaintsResult, sosResult] = await Promise.all([
+        getAssignedCases(officerId),
+        getActiveSOSAlerts()
+      ]);
+      
+      if (!complaintsResult.error) setComplaints(complaintsResult.complaints);
+      if (!sosResult.error) setSosAlerts(sosResult.alerts);
+    } catch (err) {
+      console.error("Error fetching police data:", err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleStatusChange = async (complaintId: string, newStatus: string) => {
@@ -167,7 +191,7 @@ export default function PoliceDashboard() {
     const query = searchQuery.trim().toLowerCase();
     if (!query) return true;
     const titleMatch = (c.title || "").toLowerCase().includes(query);
-    const idMatch = (c.id || "").toLowerCase().includes(query);
+    const idMatch = (c.id || "").toLowerCase().includes(query) || formatCaseId(c).toLowerCase().includes(query);
     const typeMatch = (c.type || "").toLowerCase().includes(query);
     const statusMatch = (c.status || "").toLowerCase().includes(query);
     const citizenNameMatch = (c.citizenName || "").toLowerCase().includes(query);
@@ -277,7 +301,7 @@ export default function PoliceDashboard() {
                   ) : (
                     filteredComplaints.map((c) => (
                       <tr key={c.id} className="border-b border-white/10 hover:bg-white/40 dark:hover:bg-white/5 transition-colors">
-                        <td className="px-6 py-4 font-mono text-xs text-text-tertiary">{c.id.substring(0, 8).toUpperCase()}</td>
+                        <td className="px-6 py-4 font-mono text-xs text-text-tertiary">{formatCaseId(c)}</td>
                         <td className="px-6 py-4 font-medium text-text-primary max-w-[200px] truncate">{c.title}</td>
                         <td className="px-6 py-4 text-xs font-semibold text-text-secondary">{c.citizenName || "Name Not Available"}</td>
                         <td className="px-6 py-4">
@@ -348,7 +372,7 @@ export default function PoliceDashboard() {
                     Manage {selectedComplaint.type || "FIR"}
                   </h2>
                   <p className="text-xs text-text-secondary font-mono">
-                    ID: {selectedComplaint.id.toUpperCase()}
+                    ID: {formatCaseId(selectedComplaint)}
                   </p>
                 </div>
               </div>
@@ -422,12 +446,8 @@ export default function PoliceDashboard() {
                     </div>
                   </div>
 
-                  {selectedComplaint.imageUrl && (
-                     <div>
-                       <span className="block text-[10px] uppercase font-bold text-text-secondary mb-1">Evidence Attached</span>
-                       <img src={selectedComplaint.imageUrl} alt="Evidence" className="w-full max-h-[300px] object-cover rounded-xl border border-white/20 shadow-sm" />
-                     </div>
-                  )}
+                  {/* Case Evidence Gallery (Local Storage & Video Streaming) */}
+                  <EvidenceGallery complaint={selectedComplaint} className="mt-4" />
                 </div>
               </div>
 

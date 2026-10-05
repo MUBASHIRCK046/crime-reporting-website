@@ -19,9 +19,14 @@ export function MouseGlowEnhancer() {
 
     if (isTouchDevice()) return;
 
-    const handleMouseMove = (e: MouseEvent) => {
+    let rafId: number | null = null;
+    let lastEvent: MouseEvent | null = null;
+
+    const processMouseMove = () => {
+      if (!lastEvent) return;
+      const e = lastEvent;
       const target = e.target as HTMLElement;
-      // Select all interactive buttons, cards, links
+
       const interactiveEl = target.closest<HTMLElement>(
         'button:not(:disabled), a.glass-button, a.glass-button-secondary, [role="button"]:not([aria-disabled="true"]), .clickable-card, a.btn, a.nav-link'
       );
@@ -34,22 +39,26 @@ export function MouseGlowEnhancer() {
         interactiveEl.style.setProperty("--mouse-glow-x", `${x}px`);
         interactiveEl.style.setProperty("--mouse-glow-y", `${y}px`);
 
-        // Check dark mode status
         const isDark = document.documentElement.classList.contains("dark");
-
-        // Dynamically assign variables for the liquid gradient
         if (isDark) {
-          interactiveEl.style.setProperty("--liquid-color-1", "rgba(80, 22, 214, 0.8)");
-          interactiveEl.style.setProperty("--liquid-color-2", "rgba(13, 98, 255, 1)");
-          interactiveEl.style.setProperty("--mouse-glow-active-opacity", "0.45");
+          interactiveEl.style.setProperty("--liquid-color-1", "rgba(255, 255, 255, 0.65)");
+          interactiveEl.style.setProperty("--liquid-color-2", "rgba(255, 255, 255, 0.25)");
+          interactiveEl.style.setProperty("--mouse-glow-active-opacity", "0.5");
           interactiveEl.style.setProperty("--mouse-glow-opacity", "1");
         } else {
-          // Subtle tint in light theme
-          interactiveEl.style.setProperty("--liquid-color-1", "rgba(2, 91, 255, 1)");
-          interactiveEl.style.setProperty("--liquid-color-2", "rgba(139, 92, 246, 0.10)");
-          interactiveEl.style.setProperty("--mouse-glow-active-opacity", "0.3");
+          interactiveEl.style.setProperty("--liquid-color-1", "rgba(255, 255, 255, 0.85)");
+          interactiveEl.style.setProperty("--liquid-color-2", "rgba(255, 255, 255, 0.40)");
+          interactiveEl.style.setProperty("--mouse-glow-active-opacity", "0.4");
           interactiveEl.style.setProperty("--mouse-glow-opacity", "1");
         }
+      }
+      rafId = null;
+    };
+
+    const handleMouseMove = (e: MouseEvent) => {
+      lastEvent = e;
+      if (!rafId) {
+        rafId = requestAnimationFrame(processMouseMove);
       }
     };
 
@@ -74,6 +83,7 @@ export function MouseGlowEnhancer() {
     document.addEventListener("mouseout", handleMouseOut, { passive: true });
 
     return () => {
+      if (rafId) cancelAnimationFrame(rafId);
       document.removeEventListener("mousemove", handleMouseMove);
       document.removeEventListener("mouseout", handleMouseOut);
     };

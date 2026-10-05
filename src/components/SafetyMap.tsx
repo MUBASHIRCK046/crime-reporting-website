@@ -7,12 +7,14 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
 // Fix default marker icon issue in Leaflet with Next.js/Webpack
-delete (L.Icon.Default.prototype as any)._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: "https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon-2x.png",
-  iconUrl: "https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png",
-  shadowUrl: "https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png",
-});
+if (typeof window !== "undefined") {
+  delete (L.Icon.Default.prototype as any)._getIconUrl;
+  L.Icon.Default.mergeOptions({
+    iconRetinaUrl: "https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon-2x.png",
+    iconUrl: "https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png",
+    shadowUrl: "https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png",
+  });
+}
 
 // Original three markers clustered around Mukkam, Kozhikode, Kerala, India
 const locations = [
@@ -70,8 +72,20 @@ function MapRefSetter({ mapRef }: { mapRef: React.MutableRefObject<L.Map | null>
   const map = useMap();
   useEffect(() => {
     mapRef.current = map;
+    const timer = setTimeout(() => {
+      try {
+        if (map && (map as any)._container) {
+          map.invalidateSize();
+        }
+      } catch (e) {
+        // Safe catch for Leaflet unmounting
+      }
+    }, 250);
     return () => {
-      mapRef.current = null;
+      clearTimeout(timer);
+      if (mapRef.current === map) {
+        mapRef.current = null;
+      }
     };
   }, [map, mapRef]);
   return null;
@@ -101,6 +115,11 @@ export function SafetyMap({
   onAlertMarkerClick,
   hideDetails = false
 }: SafetyMapProps = {}) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const internalMapRef = useRef<L.Map | null>(null);
   const mapRef = externalMapRef || internalMapRef;
 
@@ -428,6 +447,14 @@ export function SafetyMap({
     }
   }, [selectedAlertId, sosAlerts, mapRef]);
 
+  if (!mounted) {
+    return (
+      <div className="w-full h-full min-h-[300px] flex items-center justify-center bg-slate-900/40 rounded-xl border border-white/10 text-slate-400 font-bold text-xs">
+        Loading Safety Map...
+      </div>
+    );
+  }
+
   return (
     <div className="w-full h-full flex flex-col lg:flex-row gap-4 p-1">
       
@@ -560,35 +587,39 @@ export function SafetyMap({
           )}
 
           {/* Programmatic Popup for Nearest Station */}
-          {programmaticPopup ? (
-            <Popup
+          {programmaticPopup && customIcons?.user ? (
+            <Marker
               position={[programmaticPopup.lat, programmaticPopup.lng]}
-              eventHandlers={{
-                remove: () => setProgrammaticPopup(null)
-              }}
+              icon={customIcons.user}
             >
-              <div style={{ color: "#0f172a", padding: "6px", fontFamily: "system-ui, -apple-system, sans-serif", minWidth: "160px" }}>
-                <h4 style={{ margin: "0 0 4px 0", fontWeight: 700, fontSize: "14px" }}>{programmaticPopup.content}</h4>
-                {programmaticPopup.distance !== undefined ? (
-                  <p style={{ margin: "0", fontSize: "11px", color: "#e11d48", fontWeight: 600 }}>
-                    Nearest Police Station — {formatDistance(programmaticPopup.distance)} away
+              <Popup
+                eventHandlers={{
+                  remove: () => setProgrammaticPopup(null)
+                }}
+              >
+                <div style={{ color: "#0f172a", padding: "6px", fontFamily: "system-ui, -apple-system, sans-serif", minWidth: "160px" }}>
+                  <h4 style={{ margin: "0 0 4px 0", fontWeight: 700, fontSize: "14px" }}>{programmaticPopup.content}</h4>
+                  {programmaticPopup.distance !== undefined ? (
+                    <p style={{ margin: "0", fontSize: "11px", color: "#e11d48", fontWeight: 600 }}>
+                      Nearest Police Station — {formatDistance(programmaticPopup.distance)} away
+                    </p>
+                  ) : null}
+                  <p style={{ margin: "4px 0 0 0", fontSize: "11px", color: "#64748b" }}>
+                    Coords: {programmaticPopup.lat.toFixed(4)}, {programmaticPopup.lng.toFixed(4)}
                   </p>
-                ) : null}
-                <p style={{ margin: "4px 0 0 0", fontSize: "11px", color: "#64748b" }}>
-                  Coords: {programmaticPopup.lat.toFixed(4)}, {programmaticPopup.lng.toFixed(4)}
-                </p>
-                <div style={{ marginTop: "8px", borderTop: "1px solid #e2e8f0", paddingTop: "6px" }}>
-                  <a
-                    href={`https://www.google.com/maps/dir/?api=1&destination=${programmaticPopup.lat},${programmaticPopup.lng}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{ fontSize: "12px", fontWeight: 600, color: "#10b981", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "4px" }}
-                  >
-                    Get Directions {"→"}
-                  </a>
+                  <div style={{ marginTop: "8px", borderTop: "1px solid #e2e8f0", paddingTop: "6px" }}>
+                    <a
+                      href={`https://www.google.com/maps/dir/?api=1&destination=${programmaticPopup.lat},${programmaticPopup.lng}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ fontSize: "12px", fontWeight: 600, color: "#10b981", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "4px" }}
+                    >
+                      Get Directions {"→"}
+                    </a>
+                  </div>
                 </div>
-              </div>
-            </Popup>
+              </Popup>
+            </Marker>
           ) : null}
 
           {/* 3 Permanent Markers */}

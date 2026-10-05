@@ -17,43 +17,41 @@ export default function ChangePasswordPage() {
   const [changingPassword, setChangingPassword] = useState(false);
 
   useEffect(() => {
-    const checkAuth = async () => {
-      auth.onAuthStateChanged(async (user) => {
-        if (!user) {
-          router.push("/login");
-          return;
-        }
+    const unsubscribe = auth.onAuthStateChanged(async (user) => {
+      if (!user) {
+        router.push("/login");
+        return;
+      }
 
-        try {
-          const userDoc = await getDoc(doc(db, "users", user.uid));
-          if (userDoc.exists()) {
-            const userData = userDoc.data();
-            if (userData.role !== "police") {
-              // Redirect non-police roles to their appropriate pages
-              if (userData.role === "admin") router.push("/admin");
-              else router.push("/citizen");
-              return;
-            }
-
-            setCurrentUser({ uid: user.uid, ...userData });
-            
-            // If they don't need to change password, send them to the main dashboard
-            if (!userData.mustChangePassword) {
-              router.push("/police");
-              return;
-            }
-          } else {
-            router.push("/login");
+      try {
+        const userDoc = await getDoc(doc(db, "users", user.uid));
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          if (userData.role !== "police") {
+            // Redirect non-police roles to their appropriate pages
+            if (userData.role === "admin") router.push("/admin");
+            else router.push("/citizen");
+            return;
           }
-        } catch (err) {
-          console.error("Auth check error:", err);
+
+          setCurrentUser({ uid: user.uid, ...userData });
+          
+          // If they don't need to change password, send them to the main dashboard
+          if (!userData.mustChangePassword) {
+            router.push("/police");
+            return;
+          }
+        } else {
           router.push("/login");
-        } finally {
-          setLoading(false);
         }
-      });
-    };
-    checkAuth();
+      } catch (err) {
+        console.error("Auth check error:", err);
+        router.push("/login");
+      } finally {
+        setLoading(false);
+      }
+    });
+    return () => unsubscribe();
   }, [router]);
 
   const handleSignOut = async () => {

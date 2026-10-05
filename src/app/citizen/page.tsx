@@ -1,16 +1,17 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { triggerSOS, getMyComplaints } from "@/lib/complaints";
-import { getUserProfile, updateUserProfile, uploadProfileDocument } from "@/lib/profile";
+import { getUserProfile, updateUserProfile } from "@/lib/profile";
 import { auth, db } from "@/firebase/client";
 import { onAuthStateChanged } from "firebase/auth";
 import { logoutUser } from "@/lib/auth";
 import { 
-  Shield, LayoutDashboard, FileText, Settings, ShieldAlert,
-  Loader2, User, Activity, Monitor, Bell, Users, FileCheck, Car, Lock, LogOut, Clock, MapPin, Save, CheckCircle, UploadCloud, ImageIcon, Search, X
+  Shield, LayoutDashboard, FileText, Settings, ShieldAlert, AlertCircle,
+  Loader2, User, Activity, Monitor, Bell, Users, FileCheck, Car, Lock, LogOut, Clock, MapPin, Save, CheckCircle, UploadCloud, ImageIcon, Search, X,
+  Download, Printer
 } from "lucide-react";
 import dynamic from "next/dynamic";
 const SafetyMap = dynamic(() => import("@/components/SafetyMap").then(mod => mod.SafetyMap), { ssr: false, loading: () => <div className="h-[400px] w-full flex items-center justify-center bg-muted/20 rounded-md animate-pulse">Loading Map...</div> });
@@ -19,6 +20,9 @@ import { toast } from "sonner";
 import { doc, getDoc } from "firebase/firestore";
 import { getCaseLogs } from "@/lib/police";
 import { CaseLog } from "@/lib/types";
+import { formatCaseId } from "@/shared/utils/caseId";
+import { exportCaseToPDF, printCaseDetails } from "@/lib/export";
+import EvidenceGallery from "@/components/EvidenceGallery";
 
 export default function CitizenDashboard() {
   const router = useRouter();
@@ -59,54 +63,65 @@ export default function CitizenDashboard() {
   const [trackingComplaint, setTrackingComplaint] = useState<any | null>(null);
   const [caseLogs, setCaseLogs] = useState<CaseLog[]>([]);
   const [fetchingLogs, setFetchingLogs] = useState(false);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
-        // Enforce role
-        const userDoc = await getDoc(doc(db, "users", user.uid));
-        if (userDoc.exists()) {
-          const role = userDoc.data().role;
-          if (role === "admin") {
-            router.push("/admin");
-            return;
-          } else if (role === "police") {
-            router.push("/police");
-            return;
+        try {
+          // Enforce role
+          const userDoc = await getDoc(doc(db, "users", user.uid));
+          if (userDoc.exists()) {
+            const role = userDoc.data().role;
+            if (role === "admin") {
+              setLoading(false);
+              router.push("/admin");
+              return;
+            } else if (role === "police") {
+              setLoading(false);
+              router.push("/police");
+              return;
+            }
           }
-        }
 
-        setUserUid(user.uid);
-        // Fetch complaints
-        const result = await getMyComplaints(user.uid);
-        if (!result.error) setComplaints(result.complaints);
-        
-        // Fetch profile
-        const profResult = await getUserProfile(user.uid);
-        if (profResult.profile) {
-          setProfileData({
-            name: profResult.profile.name || "",
-            email: profResult.profile.email || "",
-            mobileNumber: profResult.profile.mobileNumber || profResult.profile.phone || "",
-            dob: profResult.profile.dob || "",
-            gender: profResult.profile.gender || "",
-            guardianName: profResult.profile.guardianName || "",
-            residentialAddress: profResult.profile.residentialAddress || profResult.profile.address || "",
-            permanentAddress: profResult.profile.permanentAddress || "",
-            bloodGroup: profResult.profile.bloodGroup || "",
-            occupation: profResult.profile.occupation || "",
-            nationality: profResult.profile.nationality || "Indian",
-            idProofType: profResult.profile.idProofType || "",
-            idProofNumber: profResult.profile.idProofNumber || "",
-            photographUrl: profResult.profile.photographUrl || "",
-            signatureUrl: profResult.profile.signatureUrl || "",
-            emergencyContactName: profResult.profile.emergencyContactName || "",
-            emergencyContactPhone: profResult.profile.emergencyContactPhone || ""
-          });
-        }
+          setUserUid(user.uid);
+          
+          // Fetch complaints & profile concurrently in parallel
+          const [result, profResult] = await Promise.all([
+            getMyComplaints(user.uid),
+            getUserProfile(user.uid)
+          ]);
 
-        setLoading(false);
+          if (!result.error) setComplaints(result.complaints);
+          
+          if (profResult.profile) {
+            setProfileData({
+              name: profResult.profile.name || "",
+              email: profResult.profile.email || "",
+              mobileNumber: profResult.profile.mobileNumber || profResult.profile.phone || "",
+              dob: profResult.profile.dob || "",
+              gender: profResult.profile.gender || "",
+              guardianName: profResult.profile.guardianName || "",
+              residentialAddress: profResult.profile.residentialAddress || profResult.profile.address || "",
+              permanentAddress: profResult.profile.permanentAddress || "",
+              bloodGroup: profResult.profile.bloodGroup || "",
+              occupation: profResult.profile.occupation || "",
+              nationality: profResult.profile.nationality || "Indian",
+              idProofType: profResult.profile.idProofType || "",
+              idProofNumber: profResult.profile.idProofNumber || "",
+              photographUrl: profResult.profile.photographUrl || "",
+              signatureUrl: profResult.profile.signatureUrl || "",
+              emergencyContactName: profResult.profile.emergencyContactName || "",
+              emergencyContactPhone: profResult.profile.emergencyContactPhone || ""
+            });
+          }
+        } catch (err) {
+          console.error("Citizen auth error:", err);
+        } finally {
+          setLoading(false);
+        }
       } else {
+        setLoading(false);
         router.push("/login");
       }
     });
@@ -185,24 +200,33 @@ export default function CitizenDashboard() {
     });
   };
 
+  const getMissingKYCFields = () => {
+    const missing: string[] = [];
+    if (!profileData.name) missing.push("Full Name");
+    if (!(profileData.mobileNumber || profileData.phone)) missing.push("Mobile Number");
+    if (!profileData.dob) missing.push("Date of Birth");
+    if (!profileData.gender) missing.push("Gender");
+    if (!(profileData.residentialAddress || profileData.address)) missing.push("Residential Address");
+    if (!profileData.idProofNumber) missing.push("ID Proof Number");
+    return missing;
+  };
+
   const isProfileComplete = () => {
-    return (
-      profileData.name &&
-      profileData.mobileNumber &&
-      profileData.dob &&
-      profileData.gender &&
-      profileData.residentialAddress &&
-      profileData.idProofNumber
-    );
+    return getMissingKYCFields().length === 0;
   };
 
   const handleReportClick = (type: "fir" | "csr") => {
-    if (!isProfileComplete()) {
-      toast.error("Please complete your KYC Profile settings before filing a report.");
+    const missing = getMissingKYCFields();
+    if (missing.length > 0) {
+      toast.error(`KYC Incomplete! Please complete missing fields: ${missing.join(", ")} before filing a report.`);
       setActiveTab("Profile Settings");
       return;
     }
-    router.push(`/citizen/report?type=${type}`);
+    if (type === "csr") {
+      router.push("/citizen/csr");
+    } else {
+      router.push("/citizen/report");
+    }
   };
 
   if (loading) {
@@ -219,6 +243,32 @@ export default function CitizenDashboard() {
     const result = await getCaseLogs(complaint.id);
     setCaseLogs((result.logs || []).filter(log => log.isPublic !== false));
     setFetchingLogs(false);
+  };
+
+  const handleDownloadCasePDF = async (complaint: any) => {
+    try {
+      setDownloadingId(complaint.id);
+      const result = await getCaseLogs(complaint.id);
+      const publicLogs = (result.logs || []).filter((log: any) => log.isPublic !== false);
+      await exportCaseToPDF(complaint, publicLogs);
+      toast.success("Case report downloaded successfully!");
+    } catch (err: any) {
+      console.error("Error exporting PDF:", err);
+      toast.error("Failed to download PDF report");
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
+  const handlePrintCase = async (complaint: any) => {
+    try {
+      const result = await getCaseLogs(complaint.id);
+      const publicLogs = (result.logs || []).filter((log: any) => log.isPublic !== false);
+      printCaseDetails(complaint, publicLogs);
+    } catch (err: any) {
+      console.error("Error printing case:", err);
+      toast.error("Failed to prepare print view");
+    }
   };
 
   const awarenessCards = [
@@ -411,6 +461,8 @@ export default function CitizenDashboard() {
                       <div className="flex justify-between items-start mb-3">
                         <h4 className="text-lg font-bold text-text-primary group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">{complaint.title}</h4>
                         <span className={`px-4 py-1.5 rounded-full text-xs font-bold border backdrop-blur-md shadow-sm ${
+                          complaint.status === "Approved" ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border-emerald-500/30" :
+                          complaint.status === "Rejected" ? "bg-red-500/20 text-red-700 dark:text-red-400 border-red-500/30" :
                           complaint.status === "Pending" ? "bg-yellow-500/20 text-yellow-700 dark:text-yellow-400 border-yellow-500/30" :
                           complaint.status === "Investigating" ? "bg-blue-500/20 text-blue-700 dark:text-blue-400 border-blue-500/30" :
                           "bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border-emerald-500/30"
@@ -420,7 +472,7 @@ export default function CitizenDashboard() {
                       </div>
                       <p className="text-text-secondary text-sm mb-6 line-clamp-2">{complaint.description}</p>
                       
-                      <div className="flex items-center justify-between">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                         <div className="flex items-center gap-5 text-xs text-text-tertiary font-medium">
                           <span className="flex items-center gap-1.5 bg-black/5 dark:bg-white/5 px-3 py-1.5 rounded-lg border border-black/5 dark:border-white/5">
                             <MapPin className="w-3.5 h-3.5" />
@@ -431,13 +483,47 @@ export default function CitizenDashboard() {
                             {new Date(complaint.createdAt).toLocaleDateString()}
                           </span>
                         </div>
-                        <button 
-                          onClick={() => handleTrackCase(complaint)}
-                          className="text-sm font-bold flex items-center gap-2 glass-button-secondary px-5 py-2.5 shadow-sm"
-                        >
-                          <Search className="w-4 h-4" />
-                          Track Case
-                        </button>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <button 
+                            onClick={() => handleTrackCase(complaint)}
+                            className="text-xs font-bold flex items-center gap-1.5 glass-button-secondary px-3.5 py-2 shadow-sm"
+                          >
+                            <Search className="w-3.5 h-3.5" />
+                            Track Case
+                          </button>
+                          <button 
+                            onClick={() => handleDownloadCasePDF(complaint)}
+                            disabled={downloadingId === complaint.id}
+                            title="Download PDF"
+                            className="text-xs font-semibold flex items-center gap-1.5 px-3 py-2 rounded-xl bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20 hover:bg-blue-500/20 transition-all shadow-sm"
+                          >
+                            {downloadingId === complaint.id ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <Download className="w-3.5 h-3.5" />
+                            )}
+                            Download
+                          </button>
+                          <button 
+                            onClick={() => handlePrintCase(complaint)}
+                            title="Print Case"
+                            className="text-xs font-semibold flex items-center gap-1.5 px-3 py-2 rounded-xl bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20 hover:bg-purple-500/20 transition-all shadow-sm"
+                          >
+                            <Printer className="w-3.5 h-3.5" />
+                            Print
+                          </button>
+                          <span className={`px-3 py-2 rounded-xl text-xs font-bold border backdrop-blur-md shadow-sm flex items-center gap-1.5 ${
+                            complaint.status === "Approved" ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border-emerald-500/30" :
+                            complaint.status === "Rejected" ? "bg-red-500/20 text-red-700 dark:text-red-300 border-red-500/30" :
+                            complaint.status === "Investigating" ? "bg-blue-500/20 text-blue-700 dark:text-blue-300 border-blue-500/30" :
+                            "bg-yellow-500/20 text-yellow-700 dark:text-yellow-400 border-yellow-500/30"
+                          }`}>
+                            {complaint.status === "Approved" ? "🟢 Approved" :
+                             complaint.status === "Rejected" ? "🔴 Rejected" :
+                             complaint.status === "Investigating" ? "🔵 Investigating" :
+                             "🟡 Pending"}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   ))
@@ -468,6 +554,40 @@ export default function CitizenDashboard() {
                   <p className="text-text-secondary mt-1">Complete your personal details for official verification.</p>
                 </div>
               </div>
+
+              {/* KYC Status Banner */}
+              {isProfileComplete() ? (
+                <div className="mb-8 p-4 bg-emerald-500/15 border border-emerald-500/30 rounded-2xl flex items-center justify-between text-emerald-800 dark:text-emerald-300 backdrop-blur-md shadow-md">
+                  <div className="flex items-center gap-3">
+                    <CheckCircle className="w-6 h-6 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                    <div>
+                      <h4 className="font-bold text-sm">KYC Profile Verified & Complete</h4>
+                      <p className="text-xs text-emerald-700 dark:text-emerald-400">Your profile meets official verification requirements for filing FIR & CSR reports.</p>
+                    </div>
+                  </div>
+                  <span className="px-3 py-1 bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 rounded-full text-xs font-extrabold uppercase">
+                    Verified
+                  </span>
+                </div>
+              ) : (
+                <div className="mb-8 p-4 bg-amber-500/15 border border-amber-500/30 rounded-2xl flex flex-col gap-2 text-amber-800 dark:text-amber-300 backdrop-blur-md shadow-md">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <AlertCircle className="w-6 h-6 text-amber-600 dark:text-amber-400 shrink-0" />
+                      <div>
+                        <h4 className="font-bold text-sm">KYC Profile Incomplete</h4>
+                        <p className="text-xs text-amber-700 dark:text-amber-400">Required fields must be completed before you can file an official FIR or CSR report.</p>
+                      </div>
+                    </div>
+                    <span className="px-3 py-1 bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/30 rounded-full text-xs font-extrabold uppercase">
+                      Action Required
+                    </span>
+                  </div>
+                  <div className="text-xs font-semibold bg-amber-500/10 p-2.5 rounded-xl border border-amber-500/20 mt-1">
+                    Missing Fields: <span className="font-bold text-amber-900 dark:text-amber-200">{getMissingKYCFields().join(", ")}</span>
+                  </div>
+                </div>
+              )}
 
               {profileSuccess && (
                 <div className="mb-8 p-4 bg-emerald-500/20 border border-emerald-500/40 rounded-xl flex items-center gap-3 text-emerald-800 dark:text-emerald-300 backdrop-blur-md shadow-lg">
@@ -720,19 +840,44 @@ export default function CitizenDashboard() {
                   Case Tracking
                 </h2>
                 <p className="text-xs text-text-secondary font-mono mt-2 opacity-80">
-                  ID: {trackingComplaint.id.toUpperCase()} • {trackingComplaint.title}
+                  ID: {formatCaseId(trackingComplaint)} • {trackingComplaint.title}
                 </p>
               </div>
-              <button 
-                onClick={() => setTrackingComplaint(null)}
-                className="p-2 text-text-tertiary hover:text-text-primary hover:bg-black/5 dark:hover:bg-white/10 rounded-xl transition-all"
-              >
-                <X className="w-6 h-6" />
-              </button>
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={() => handleDownloadCasePDF(trackingComplaint)}
+                  disabled={downloadingId === trackingComplaint.id}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-blue-700 dark:text-blue-300 bg-blue-500/10 hover:bg-blue-500/20 rounded-lg transition-colors border border-blue-500/20 backdrop-blur-sm"
+                >
+                  {downloadingId === trackingComplaint.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+                  Download PDF
+                </button>
+                <button 
+                  onClick={() => handlePrintCase(trackingComplaint)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-purple-700 dark:text-purple-300 bg-purple-500/10 hover:bg-purple-500/20 rounded-lg transition-colors border border-purple-500/20 backdrop-blur-sm"
+                >
+                  <Printer className="w-3.5 h-3.5" /> Print
+                </button>
+                <button 
+                  onClick={() => setTrackingComplaint(null)}
+                  className="p-2 text-text-tertiary hover:text-text-primary hover:bg-black/5 dark:hover:bg-white/10 rounded-xl transition-all"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
             </div>
 
-            {/* Timeline */}
+            {/* Modal Body */}
             <div className="flex-1 overflow-y-auto p-8">
+              {/* Evidence Gallery */}
+              <EvidenceGallery complaint={trackingComplaint} className="mb-8" />
+
+              {/* Timeline */}
+              <h3 className="text-xs font-bold text-text-secondary uppercase tracking-wider mb-4 flex items-center gap-2">
+                <Clock className="w-4 h-4 text-emerald-500" />
+                Investigation Updates & Timeline
+              </h3>
+
               {fetchingLogs ? (
                 <div className="flex flex-col items-center justify-center h-40 gap-4">
                   <Loader2 className="w-8 h-8 animate-spin text-blue-500" />

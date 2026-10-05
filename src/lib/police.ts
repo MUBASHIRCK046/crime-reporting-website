@@ -16,22 +16,21 @@ import { CaseLog } from "./types";
  */
 export async function getAllComplaints() {
   try {
-    // Fetch Old/Simple CSR complaints
     const q1 = query(collection(db, "complaints"), orderBy("createdAt", "desc"));
-    const snapshot1 = await getDocs(q1);
+    const q2 = query(collection(db, "incidents"), orderBy("createdAt", "desc"));
+    
+    // 1. Fetch CSRs, FIRs, and Reviews in parallel (single round-trip bundle)
+    const [snapshot1, snapshot2, reviewsSnapshot] = await Promise.all([
+      getDocs(q1),
+      getDocs(q2),
+      getDocs(collection(db, "officer_reviews"))
+    ]);
+
     const complaints: any[] = [];
     snapshot1.forEach((doc) => {
       complaints.push({ id: doc.id, type: "CSR", ...doc.data() });
     });
 
-    // Fetch New Complex FIR incidents
-    const q2 = query(collection(db, "incidents"), orderBy("createdAt", "desc"));
-    const snapshot2 = await getDocs(q2);
-    
-    // We also need to fetch officer_reviews for FIRs to get their status, 
-    // but for listing, we might just assume 'Submitted' if not found or do a separate fetch.
-    // To keep it performant, we fetch all reviews and map them.
-    const reviewsSnapshot = await getDocs(collection(db, "officer_reviews"));
     const reviewsMap: Record<string, any> = {};
     reviewsSnapshot.forEach((doc) => {
       const data = doc.data();
@@ -42,39 +41,39 @@ export async function getAllComplaints() {
       const data = doc.data();
       const review = reviewsMap[data.firNumber];
       complaints.push({ 
+        ...data,
         id: doc.id, 
         type: "FIR",
         title: `FIR: ${data.category || 'Incident'} at ${data.location}`,
         citizenId: data.complainantId,
         firNumber: data.firNumber,
-        status: review ? review.status : "Submitted",
-        assignedOfficerId: review ? review.officerId : null,
-        ...data 
+        status: review ? review.status : (data.status || "Pending"),
+        assignedOfficerId: review ? review.officerId : (data.assignedOfficerId || null),
       });
     });
 
-    // Resolve citizen names using memory cache to prevent duplicate queries
+    // 2. High-Performance Parallel Batch User Resolution (eliminates N+1 sequential waterfall)
+    const uniqueCitizenIds = Array.from(
+      new Set(complaints.map((c) => c.citizenId).filter(Boolean))
+    );
+
+    const userDocSnaps = await Promise.all(
+      uniqueCitizenIds.map((uid) => getDoc(doc(db, "users", uid)).catch(() => null))
+    );
+
     const nameCache: Record<string, string> = {};
-    for (const c of complaints) {
-      const idToFetch = c.citizenId;
-      if (idToFetch) {
-        if (nameCache[idToFetch] !== undefined) {
-          c.citizenName = nameCache[idToFetch];
-        } else {
-          try {
-            const userDoc = await getDoc(doc(db, "users", idToFetch));
-            const name = userDoc.exists() ? (userDoc.data().name || "Name Not Available") : "Name Not Available";
-            nameCache[idToFetch] = name;
-            c.citizenName = name;
-          } catch (err) {
-            nameCache[idToFetch] = "Name Not Available";
-            c.citizenName = "Name Not Available";
-          }
-        }
+    userDocSnaps.forEach((uDoc, idx) => {
+      const uid = uniqueCitizenIds[idx];
+      if (uDoc && uDoc.exists()) {
+        nameCache[uid] = uDoc.data().name || "Name Not Available";
       } else {
-        c.citizenName = "Name Not Available";
+        nameCache[uid] = "Name Not Available";
       }
-    }
+    });
+
+    complaints.forEach((c) => {
+      c.citizenName = (c.citizenId && nameCache[c.citizenId]) || "Name Not Available";
+    });
 
     // Sort combined array
     complaints.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -103,27 +102,28 @@ export async function getActiveSOSAlerts() {
       alerts.push({ id: doc.id, ...doc.data() });
     });
     
-    // Resolve citizen names using memory cache
+    // Parallel batch citizen name resolution
+    const uniqueCitizenIds = Array.from(
+      new Set(alerts.map((a) => a.citizenId).filter(Boolean))
+    );
+
+    const userDocSnaps = await Promise.all(
+      uniqueCitizenIds.map((uid) => getDoc(doc(db, "users", uid)).catch(() => null))
+    );
+
     const nameCache: Record<string, string> = {};
-    for (const a of alerts) {
-      if (a.citizenId) {
-        if (nameCache[a.citizenId] !== undefined) {
-          a.citizenName = nameCache[a.citizenId];
-        } else {
-          try {
-            const userDoc = await getDoc(doc(db, "users", a.citizenId));
-            const name = userDoc.exists() ? (userDoc.data().name || "Name Not Available") : "Name Not Available";
-            nameCache[a.citizenId] = name;
-            a.citizenName = name;
-          } catch (err) {
-            nameCache[a.citizenId] = "Name Not Available";
-            a.citizenName = "Name Not Available";
-          }
-        }
+    userDocSnaps.forEach((uDoc, idx) => {
+      const uid = uniqueCitizenIds[idx];
+      if (uDoc && uDoc.exists()) {
+        nameCache[uid] = uDoc.data().name || "Name Not Available";
       } else {
-        a.citizenName = "Name Not Available";
+        nameCache[uid] = "Name Not Available";
       }
-    }
+    });
+
+    alerts.forEach((a) => {
+      a.citizenName = (a.citizenId && nameCache[a.citizenId]) || "Name Not Available";
+    });
 
     // Sort client-side to avoid needing a Firestore composite index
     alerts.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
@@ -140,10 +140,7 @@ export async function getActiveSOSAlerts() {
  */
 export async function updateComplaintStatus(complaintId: string, newStatus: string) {
   try {
-    // 1. Point exactly to the document we want to change
     const complaintRef = doc(db, "complaints", complaintId);
-    
-    // 2. Tell Firestore to ONLY update the 'status' field, leaving everything else alone
     await updateDoc(complaintRef, {
       status: newStatus
     });
@@ -156,27 +153,24 @@ export async function updateComplaintStatus(complaintId: string, newStatus: stri
 }
 
 /**
- * Beginner Note: 
- * Notice how we use 'updateDoc' instead of 'setDoc' here?
- * 'updateDoc' only changes the fields you specify (like 'status').
- * If we used 'setDoc', it would erase the whole complaint and replace it!
- * ====================================================
- */
-
-/**
  * Fetches complaints specifically assigned to this police officer.
  */
 export async function getAssignedCases(officerId: string) {
   try {
     const q1 = query(collection(db, "complaints"), where("assignedOfficerId", "==", officerId));
-    const snapshot1 = await getDocs(q1);
+    const qReviews = query(collection(db, "officer_reviews"), where("officerId", "==", officerId));
+    
+    // Fetch assigned CSRs and officer reviews in parallel
+    const [snapshot1, reviewsSnapshot] = await Promise.all([
+      getDocs(q1),
+      getDocs(qReviews)
+    ]);
+
     const complaints: any[] = [];
     snapshot1.forEach((doc) => {
       complaints.push({ id: doc.id, type: "CSR", ...doc.data() });
     });
 
-    const qReviews = query(collection(db, "officer_reviews"), where("officerId", "==", officerId));
-    const reviewsSnapshot = await getDocs(qReviews);
     const firNumbers: string[] = [];
     const reviewsMap: Record<string, any> = {};
     
@@ -189,8 +183,6 @@ export async function getAssignedCases(officerId: string) {
     });
 
     if (firNumbers.length > 0) {
-      // Chunk firNumbers if greater than 10 (Firestore 'in' limit is 10), but for this demo assume < 10
-      // To be safe and bypass the 10 limit, we fetch all and filter client side
       const q2 = query(collection(db, "incidents"), orderBy("createdAt", "desc"));
       const snapshot2 = await getDocs(q2);
       
@@ -204,7 +196,7 @@ export async function getAssignedCases(officerId: string) {
             title: `FIR: ${data.category || 'Incident'} at ${data.location}`,
             citizenId: data.complainantId,
             firNumber: data.firNumber,
-            status: review ? review.status : "Submitted",
+            status: review ? review.status : (data.status || "Pending"),
             assignedOfficerId: review ? review.officerId : null,
             ...data 
           });
@@ -212,28 +204,28 @@ export async function getAssignedCases(officerId: string) {
       });
     }
 
-    // Resolve citizen names using cache
+    // Parallel batch citizen name resolution
+    const uniqueCitizenIds = Array.from(
+      new Set(complaints.map((c) => c.citizenId).filter(Boolean))
+    );
+
+    const userDocSnaps = await Promise.all(
+      uniqueCitizenIds.map((uid) => getDoc(doc(db, "users", uid)).catch(() => null))
+    );
+
     const nameCache: Record<string, string> = {};
-    for (const c of complaints) {
-      const idToFetch = c.citizenId;
-      if (idToFetch) {
-        if (nameCache[idToFetch] !== undefined) {
-          c.citizenName = nameCache[idToFetch];
-        } else {
-          try {
-            const userDoc = await getDoc(doc(db, "users", idToFetch));
-            const name = userDoc.exists() ? (userDoc.data().name || "Name Not Available") : "Name Not Available";
-            nameCache[idToFetch] = name;
-            c.citizenName = name;
-          } catch (err) {
-            nameCache[idToFetch] = "Name Not Available";
-            c.citizenName = "Name Not Available";
-          }
-        }
+    userDocSnaps.forEach((uDoc, idx) => {
+      const uid = uniqueCitizenIds[idx];
+      if (uDoc && uDoc.exists()) {
+        nameCache[uid] = uDoc.data().name || "Name Not Available";
       } else {
-        c.citizenName = "Name Not Available";
+        nameCache[uid] = "Name Not Available";
       }
-    }
+    });
+
+    complaints.forEach((c) => {
+      c.citizenName = (c.citizenId && nameCache[c.citizenId]) || "Name Not Available";
+    });
 
     complaints.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     return { complaints, error: null };

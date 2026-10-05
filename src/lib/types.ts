@@ -69,9 +69,9 @@ export interface SOSAlert {
   timestamp: string;
 }
 
-export interface FIRIncident extends Record<string, any> {}
-export interface FIROffence extends Record<string, any> {}
-export interface FIREvidence extends Record<string, any> {}
-export interface FIRWitness extends Record<string, any> {}
-export interface FIRStatement extends Record<string, any> {}
-export interface FIROfficerReview extends Record<string, any> {}
+export type FIRIncident = Record<string, any>;
+export type FIROffence = Record<string, any>;
+export type FIREvidence = Record<string, any>;
+export type FIRWitness = Record<string, any>;
+export type FIRStatement = Record<string, any>;
+export type FIROfficerReview = Record<string, any>;
