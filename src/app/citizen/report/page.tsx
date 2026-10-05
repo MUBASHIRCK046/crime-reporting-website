@@ -691,7 +691,7 @@ export default function ReportIncidentPage() {
   // Motion Variants
   const pageVariants = {
     initial: { opacity: 0, y: 15 },
-    animate: { opacity: 1, y: 0, transition: { duration: 0.5, ease: "easeOut" } },
+    animate: { opacity: 1, y: 0, transition: { duration: 0.5, ease: "easeOut" as const } },
   };
 
   const slideVariants = {
@@ -704,13 +704,13 @@ export default function ReportIncidentPage() {
       x: 0,
       opacity: 1,
       filter: "blur(0px)",
-      transition: { duration: 0.35, ease: [0.25, 1, 0.5, 1] },
+      transition: { duration: 0.35, ease: [0.25, 1, 0.5, 1] as const },
     },
     exit: (dir: number) => ({
       x: dir > 0 ? -30 : 30,
       opacity: 0,
       filter: "blur(4px)",
-      transition: { duration: 0.25, ease: [0.25, 1, 0.5, 1] },
+      transition: { duration: 0.25, ease: [0.25, 1, 0.5, 1] as const },
     }),
   };
 

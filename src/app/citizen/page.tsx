@@ -203,10 +203,10 @@ export default function CitizenDashboard() {
   const getMissingKYCFields = () => {
     const missing: string[] = [];
     if (!profileData.name) missing.push("Full Name");
-    if (!(profileData.mobileNumber || profileData.phone)) missing.push("Mobile Number");
+    if (!profileData.mobileNumber) missing.push("Mobile Number");
     if (!profileData.dob) missing.push("Date of Birth");
     if (!profileData.gender) missing.push("Gender");
-    if (!(profileData.residentialAddress || profileData.address)) missing.push("Residential Address");
+    if (!profileData.residentialAddress) missing.push("Residential Address");
     if (!profileData.idProofNumber) missing.push("ID Proof Number");
     return missing;
   };
