@@ -47,15 +47,12 @@ export function getDb(): Firestore {
   if (!_db) {
     const appInstance = getFirebaseApp();
     try {
-      _db = getFirestore(appInstance);
+      _db = initializeFirestore(appInstance, {
+        experimentalAutoDetectLongPolling: true,
+        ignoreUndefinedProperties: true,
+      });
     } catch {
-      try {
-        _db = initializeFirestore(appInstance, {
-          experimentalAutoDetectLongPolling: true
-        });
-      } catch {
-        _db = getFirestore(appInstance);
-      }
+      _db = getFirestore(appInstance);
     }
   }
   return _db;

@@ -21,7 +21,7 @@ export const metadata: Metadata = {
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { MouseGlowEnhancer } from "@/components/MouseGlowEnhancer";
-import { ClientErrorSuppressor } from "@/components/ClientErrorSuppressor";
+import { ClientErrorSuppressor, abortSuppressorScript } from "@/components/ClientErrorSuppressor";
 
 export default function RootLayout({
   children,
@@ -35,6 +35,10 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <head>
+        <script
+          id="abort-suppressor"
+          dangerouslySetInnerHTML={{ __html: abortSuppressorScript }}
+        />
         <link rel="preconnect" href="https://firebasestorage.googleapis.com" />
         <link rel="preconnect" href="https://firestore.googleapis.com" />
         <link rel="preconnect" href="https://identitytoolkit.googleapis.com" />
